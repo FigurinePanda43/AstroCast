@@ -74,32 +74,67 @@ def _stumpff(z: float) -> tuple[float, float]:
     return 0.5 - z / 24.0 + z * z / 720.0, 1.0 / 6.0 - z / 120.0 + z * z / 5040.0
 
 
-def _perifocal_position(q: float, e: float, dt_days: float) -> tuple[float, float]:
-    """Position in the orbital plane (x towards perihelion) after ``dt`` days."""
+def _universal_anomaly(q: float, e: float, dt_days: float) -> float:
+    """Solve the universal Kepler equation for an orbit starting at perihelion.
+
+    F(χ) = (1 − αq) χ³ S(αχ²) + q χ − √μ Δt is strictly increasing (dF/dχ is the
+    heliocentric distance), so the root is bracketed and a Newton iteration that
+    falls back to bisection whenever it leaves the bracket always converges —
+    including for near-parabolic and very eccentric orbits where plain Newton
+    can run away.
+    """
     alpha = (1.0 - e) / q  # reciprocal semi-major axis
-    v0 = math.sqrt(MU * (1.0 + e) / q)
-    sqrt_mu = math.sqrt(MU)
-    # Initial guess for the universal anomaly.
-    if alpha > 0:
-        chi = sqrt_mu * dt_days * alpha
-    else:
-        chi = math.copysign(1.0, dt_days) * (abs(6.0 * q * sqrt_mu * dt_days)) ** (1.0 / 3.0)
-        if abs(dt_days) < 1e-9:
-            chi = 0.0
-    for _ in range(80):
+    target = math.sqrt(MU) * dt_days
+    if target == 0.0:
+        return 0.0
+
+    def func(chi: float) -> tuple[float, float]:
         z = alpha * chi * chi
         c, s = _stumpff(z)
-        f_val = (1.0 - alpha * q) * chi**3 * s + q * chi - sqrt_mu * dt_days
-        # dF/dchi equals the heliocentric distance for this formulation.
-        derivative = (1.0 - alpha * q) * chi * chi * c + q
-        step = f_val / derivative
-        chi -= step
-        if abs(step) < 1e-12 * max(1.0, abs(chi)):
-            break
-    z = alpha * chi * chi
-    c, s = _stumpff(z)
+        value = (1.0 - alpha * q) * chi**3 * s + q * chi - target
+        return value, (1.0 - alpha * q) * chi * chi * c + q
+
+    if alpha > 0:
+        # dt is wrapped to ±P/2, i.e. eccentric anomaly within ±π.
+        limit = math.pi / math.sqrt(alpha)
+        lo, hi = -limit, limit
+    else:
+        lo, hi = -1.0, 1.0
+        for _ in range(80):
+            if func(hi)[0] >= 0:
+                break
+            hi *= 2.0
+        for _ in range(80):
+            if func(lo)[0] <= 0:
+                break
+            lo *= 2.0
+    chi = min(max(target / q, lo), hi) if abs(target / q) < hi else (lo + hi) / 2.0
+    for _ in range(200):
+        value, derivative = func(chi)
+        if value > 0:
+            hi = chi
+        else:
+            lo = chi
+        step = value / derivative if derivative > 0 else 0.0
+        candidate = chi - step
+        if not lo < candidate < hi:
+            candidate = (lo + hi) / 2.0
+        if abs(candidate - chi) <= 1e-13 * max(1.0, abs(chi)) or hi - lo <= 1e-14 * max(
+            1.0, abs(chi)
+        ):
+            return candidate
+        chi = candidate
+    return chi
+
+
+def _perifocal_position(q: float, e: float, dt_days: float) -> tuple[float, float]:
+    """Position in the orbital plane (x towards perihelion) after ``dt`` days."""
+    alpha = (1.0 - e) / q
+    v0 = math.sqrt(MU * (1.0 + e) / q)
+    chi = _universal_anomaly(q, e, dt_days)
+    c, s = _stumpff(alpha * chi * chi)
     f = 1.0 - chi * chi / q * c
-    g = dt_days - chi**3 * s / sqrt_mu
+    g = dt_days - chi**3 * s / math.sqrt(MU)
     return f * q, g * v0
 
 

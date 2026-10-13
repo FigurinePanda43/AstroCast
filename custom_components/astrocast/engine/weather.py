@@ -260,14 +260,23 @@ def build_timeline(
     now: datetime,
     elevation: float,
     max_days: int = 16,
+    start: datetime | None = None,
 ) -> Timeline:
-    """Merge provider series into an hourly timeline starting just before ``now``."""
+    """Merge provider series into an hourly timeline.
+
+    The timeline starts two hours before ``now`` or at ``start`` if earlier
+    (the beginning of the current night, so that the night keeps its analysis
+    after midnight; providers return the recent past as well).
+    """
     now = now.astimezone(UTC)
-    start = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=2)
+    first = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=2)
+    if start is not None:
+        first = min(first, start.astimezone(UTC).replace(minute=0, second=0, microsecond=0))
+    start = first
     ends = [s.end for s in series.values() if s.end is not None]
     if not ends:
         return Timeline([], series)
-    last = min(max(ends), (start + timedelta(days=max_days)).timestamp())
+    last = min(max(ends), (now + timedelta(days=max_days)).timestamp())
     hours: list[HourlyWeather] = []
     ensemble = series.get("ensemble")
     seven = series.get("7timer")

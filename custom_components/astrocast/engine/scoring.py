@@ -169,6 +169,12 @@ class NightWeather:
     clear_probability: np.ndarray
     members: list[list[float] | None]
     sources: dict[str, str]
+    in_range: np.ndarray | None = None
+
+    def __post_init__(self) -> None:
+        """Default: every sample may be covered."""
+        if self.in_range is None:
+            self.in_range = np.ones(len(self.has_weather), dtype=bool)
 
     def get(self, name: str) -> np.ndarray:
         """Array of a quantity (NaN where unknown)."""
@@ -209,6 +215,12 @@ def sample_weather(timeline: w.Timeline | None, ephem: NightEphemeris) -> NightW
         return NightWeather(values, has, tiers, conf, clear, members, sources)
     start = timeline.start.timestamp()
     end = timeline.end.timestamp()
+    # Samples before the first hour with cloud data (the past, for providers
+    # that do not return it) cannot be covered.
+    first_cloud = next(
+        (h.time.timestamp() for h in timeline.hours if h.values.get(w.CLOUD) is not None), end
+    )
+    in_range = ephem.unix >= first_cloud
     for i, ts in enumerate(ephem.unix):
         if ts < start or ts > end:
             continue
@@ -227,7 +239,7 @@ def sample_weather(timeline: w.Timeline | None, ephem: NightEphemeris) -> NightW
         members[i] = hour.members
         for name, source in hour.sources.items():
             sources.setdefault(name, source)
-    return NightWeather(values, has, tiers, conf, clear, members, sources)
+    return NightWeather(values, has, tiers, conf, clear, members, sources, in_range)
 
 
 def zenith_moon_brightening(
@@ -377,7 +389,8 @@ def analyse_profile(
         result.potential = int(round(pot[2]))
 
     covered = usable & weather.has_weather
-    if not np.any(usable) or np.count_nonzero(covered) < 0.5 * np.count_nonzero(usable):
+    expected = usable & weather.in_range
+    if not np.any(expected) or np.count_nonzero(covered) < 0.5 * np.count_nonzero(expected):
         return result  # outside the weather forecast range: potential only
 
     block = _best_block(scores, usable, block_len)

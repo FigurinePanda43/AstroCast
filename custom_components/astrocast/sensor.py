@@ -50,7 +50,6 @@ class AstroCastSensorDescription(SensorEntityDescription):
 
     value_fn: Callable[[AstroCastCoordinator, Forecast], Any]
     attrs_fn: Callable[[AstroCastCoordinator, Forecast], dict[str, Any]] | None = None
-    unrecorded: frozenset[str] = frozenset()
 
 
 def _profile_attrs(night: NightForecast, profile: ProfileNight, language: str) -> dict[str, Any]:
@@ -313,7 +312,6 @@ SENSORS: tuple[AstroCastSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda c, f: f.tonight.deep_sky.score,
         attrs_fn=lambda c, f: _profile_attrs(f.tonight, f.tonight.deep_sky, c.hass.config.language),
-        unrecorded=frozenset({"factors"}),
     ),
     AstroCastSensorDescription(
         key="planetary_tonight",
@@ -324,7 +322,6 @@ SENSORS: tuple[AstroCastSensorDescription, ...] = (
         attrs_fn=lambda c, f: _profile_attrs(
             f.tonight, f.tonight.planetary, c.hass.config.language
         ),
-        unrecorded=frozenset({"factors"}),
     ),
     AstroCastSensorDescription(
         key="deep_sky_now",
@@ -333,7 +330,6 @@ SENSORS: tuple[AstroCastSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda c, f: f.now.scores.get("deep_sky"),
         attrs_fn=_now_attrs("deep_sky"),
-        unrecorded=frozenset({"factors"}),
     ),
     AstroCastSensorDescription(
         key="planetary_now",
@@ -342,7 +338,6 @@ SENSORS: tuple[AstroCastSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda c, f: f.now.scores.get("planetary"),
         attrs_fn=_now_attrs("planetary"),
-        unrecorded=frozenset({"factors"}),
     ),
     AstroCastSensorDescription(
         key="best_night",
@@ -350,7 +345,6 @@ SENSORS: tuple[AstroCastSensorDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=_best_night_value,
         attrs_fn=_best_night_attrs,
-        unrecorded=frozenset({"nights"}),
     ),
     AstroCastSensorDescription(
         key="cloud_cover",
@@ -429,14 +423,12 @@ SENSORS: tuple[AstroCastSensorDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=_next_event,
         attrs_fn=_next_event_attrs,
-        unrecorded=frozenset({"upcoming"}),
     ),
     AstroCastSensorDescription(
         key="top_object",
         translation_key="top_object",
         value_fn=_top_object,
         attrs_fn=_top_object_attrs,
-        unrecorded=frozenset({"objects"}),
     ),
     AstroCastSensorDescription(
         key="visible_planets",
@@ -444,7 +436,6 @@ SENSORS: tuple[AstroCastSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=_visible_planets,
         attrs_fn=_planet_attrs,
-        unrecorded=frozenset({"planets"}),
     ),
     AstroCastSensorDescription(
         key="data_sources",
@@ -454,7 +445,6 @@ SENSORS: tuple[AstroCastSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_health,
         attrs_fn=_health_attrs,
-        unrecorded=frozenset({"providers"}),
     ),
 )
 
@@ -479,6 +469,11 @@ class AstroCastSensor(AstroCastEntity, SensorEntity):
     """A sensor driven by an entity description."""
 
     entity_description: AstroCastSensorDescription
+    # Large or fast-changing attributes are kept out of the recorder. Home
+    # Assistant merges this set once per class, so it must be declared here.
+    _unrecorded_attributes = frozenset(
+        {"factors", "nights", "upcoming", "objects", "planets", "providers", "generated"}
+    )
 
     def __init__(
         self, coordinator: AstroCastCoordinator, description: AstroCastSensorDescription
@@ -486,9 +481,6 @@ class AstroCastSensor(AstroCastEntity, SensorEntity):
         """Initialise."""
         super().__init__(coordinator, description.key)
         self.entity_description = description
-        self._unrecorded_attributes = frozenset(
-            {*self._unrecorded_attributes, *description.unrecorded}
-        )
         self._update_from_data()
 
     def _update_from_data(self) -> None:
