@@ -20,9 +20,3 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
--------------------------------------------------------------------------------
-The deep-sky catalog shipped in custom_components/astrocast/data/dso_catalog.json
-is derived from OpenNGC (https://github.com/mattiaverga/OpenNGC, (c) Mattia
-Verga) and is distributed under the Creative Commons Attribution-ShareAlike 4.0
-International licence (CC BY-SA 4.0). See
-custom_components/astrocast/data/LICENSE-catalog.md.

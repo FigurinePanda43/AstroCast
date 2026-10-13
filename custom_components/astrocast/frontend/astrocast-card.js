@@ -22,6 +22,8 @@ const STRINGS = {
     sky: "Sky",
     best_window: "Best window",
     no_window: "No good window tonight",
+    no_weather: "No weather forecast available right now: the curves show what the sky would offer if clear.",
+    if_clear: "If clear",
     limited_by: "limited by",
     astro_night: "Astronomical night",
     no_astro_night: "No astronomical night",
@@ -164,6 +166,8 @@ const STRINGS = {
     sky: "Ciel",
     best_window: "Meilleure fenêtre",
     no_window: "Pas de bonne fenêtre cette nuit",
+    no_weather: "Aucune prévision météo disponible pour le moment : les courbes montrent ce que le ciel offrirait s'il était dégagé.",
+    if_clear: "Si dégagé",
     limited_by: "limité par",
     astro_night: "Nuit astronomique",
     no_astro_night: "Pas de nuit astronomique",
@@ -710,14 +714,16 @@ class AstroCastView extends HTMLElement {
       return `<div class="score" style="border-left:4px solid ${color}">
         <div class="label"><span>${esc(this.t(profile))} · ${esc(this.t("tonight").toLowerCase())}</span></div>
         <div class="value">${score ?? "—"}<small>/100</small></div>
-        <div class="rating" style="color:${RATING_COLORS[rating] || "inherit"}">${rating ? esc(this.t(`rating_${rating}`)) : ""}</div>
+        <div class="rating" style="color:${RATING_COLORS[rating] || "inherit"}">${rating ? esc(this.t(`rating_${rating}`)) : p.potential !== null && p.potential !== undefined ? `<span style="color:var(--ac-muted);font-weight:500">${esc(this.t("if_clear"))} : ${p.potential}</span>` : ""}</div>
         <div class="now">${esc(this.t("now"))} : ${nowScore ?? "—"}${d.now.limiting?.[profile] && nowScore !== null ? ` · ${esc(this.t("limited_by"))} ${esc(this.t(`factor_${d.now.limiting[profile]}`))}` : ""}</div>
         <div class="bar" style="width:${score || 0}%;background:${RATING_COLORS[rating] || color}"></div>
       </div>`;
     };
     const ds = night.deep_sky;
     let summary;
-    if (ds.window_start) {
+    if (!night.has_weather) {
+      summary = esc(this.t("no_weather"));
+    } else if (ds.window_start) {
       summary = `<b>${esc(this.t("best_window"))}</b> ${this.fmtTime(ds.window_start)} → ${this.fmtTime(ds.window_end)} (${ds.window_score}/100)`;
       if (ds.limiting) summary += ` · ${esc(this.t("limited_by"))} ${esc(this.t(`factor_${ds.limiting}`))}`;
     } else {

@@ -156,8 +156,9 @@ def _samples(night: NightForecast, span: tuple[int, int], step: int, full: bool)
         "sun_alt": _array(ephem.sun_alt[sl], 0),
         "moon_alt": _array(ephem.moon_alt[sl], 0),
         "moon_az": _array(ephem.moon_az[sl], 0),
-        "deep_sky": _array(night.deep_sky.scores[sl], 0),
-        "planetary": _array(night.planetary.scores[sl], 0),
+        # Unknown (not zero) where no weather forecast covers the sample.
+        "deep_sky": _array(np.where(weather.has_weather, night.deep_sky.scores, np.nan)[sl], 0),
+        "planetary": _array(np.where(weather.has_weather, night.planetary.scores, np.nan)[sl], 0),
         "cloud": _array(weather.get(w.CLOUD)[sl], 0),
         "clear_probability": _array(weather.clear_probability[sl], 0),
     }
