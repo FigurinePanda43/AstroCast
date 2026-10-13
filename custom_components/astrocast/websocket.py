@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-import voluptuous as vol
-
 from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+import voluptuous as vol
 
 from .const import CONF_FAVORITES, DOMAIN
 from .coordinator import AstroCastCoordinator, signal_update
@@ -52,7 +51,9 @@ def _coordinator(
     return entry.runtime_data
 
 
-def _payload(hass: HomeAssistant, coordinator: AstroCastCoordinator, language: str) -> dict[str, Any]:
+def _payload(
+    hass: HomeAssistant, coordinator: AstroCastCoordinator, language: str
+) -> dict[str, Any]:
     payload = forecast_to_dict(
         coordinator.data,
         language,
@@ -96,9 +97,7 @@ async def ws_forecast(
     coordinator = _coordinator(hass, connection, msg)
     if coordinator is None:
         return
-    payload = await hass.async_add_executor_job(
-        _payload, hass, coordinator, _language(hass, msg)
-    )
+    payload = await hass.async_add_executor_job(_payload, hass, coordinator, _language(hass, msg))
     connection.send_result(msg["id"], payload)
 
 
@@ -175,8 +174,13 @@ def search_objects(
         name = body_name(language, key)
         if needle in key or needle in name.lower():
             results.append(
-                {"id": key, "kind": "moon" if key == "moon" else "planet", "type": key,
-                 "name": name, "favorite": key in favorites}
+                {
+                    "id": key,
+                    "kind": "moon" if key == "moon" else "planet",
+                    "type": key,
+                    "name": name,
+                    "favorite": key in favorites,
+                }
             )
     for obj in coordinator.shared.catalog.search(query, limit):
         results.append(
@@ -193,8 +197,13 @@ def search_objects(
     for elements in (*coordinator.shared.comets, *coordinator.shared.asteroids):
         if needle in elements.name.lower():
             results.append(
-                {"id": elements.id, "kind": elements.kind, "type": elements.kind,
-                 "name": elements.name, "favorite": elements.id in favorites}
+                {
+                    "id": elements.id,
+                    "kind": elements.kind,
+                    "type": elements.kind,
+                    "name": elements.name,
+                    "favorite": elements.id in favorites,
+                }
             )
     return results[:limit]
 

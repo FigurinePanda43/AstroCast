@@ -321,7 +321,9 @@ SENSORS: tuple[AstroCastSensorDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda c, f: f.tonight.planetary.score,
-        attrs_fn=lambda c, f: _profile_attrs(f.tonight, f.tonight.planetary, c.hass.config.language),
+        attrs_fn=lambda c, f: _profile_attrs(
+            f.tonight, f.tonight.planetary, c.hass.config.language
+        ),
         unrecorded=frozenset({"factors"}),
     ),
     AstroCastSensorDescription(
@@ -523,7 +525,11 @@ class FavoriteSensor(AstroCastEntity, SensorEntity):
         else:
             from .i18n import body_name  # noqa: PLC0415
 
-            label = body_name(language, object_id) if ":" not in object_id else object_id.split(":", 1)[1]
+            label = (
+                body_name(language, object_id)
+                if ":" not in object_id
+                else object_id.split(":", 1)[1]
+            )
         self._attr_translation_placeholders = {"object": label}
         self._update_from_data()
 

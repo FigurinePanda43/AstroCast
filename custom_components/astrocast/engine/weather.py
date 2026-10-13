@@ -16,6 +16,7 @@ from __future__ import annotations
 from bisect import bisect_left
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 import math
 from typing import Any
 
@@ -230,7 +231,7 @@ def seeing_from_jetstream(jet_kmh: float) -> float:
 def _interp_table(x: float, table: tuple[tuple[float, float], ...]) -> float:
     if x <= table[0][0]:
         return table[0][1]
-    for (x0, y0), (x1, y1) in zip(table, table[1:], strict=False):
+    for (x0, y0), (x1, y1) in pairwise(table):
         if x <= x1:
             return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
     return table[-1][1]

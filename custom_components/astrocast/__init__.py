@@ -45,11 +45,7 @@ CARD_URL = f"{URL_BASE}/{CARD_FILENAME}?v={VERSION}"
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register the frontend resources, services and websocket commands."""
     await hass.http.async_register_static_paths(
-        [
-            StaticPathConfig(
-                URL_BASE, str(Path(__file__).parent / "frontend"), cache_headers=False
-            )
-        ]
+        [StaticPathConfig(URL_BASE, str(Path(__file__).parent / "frontend"), cache_headers=False)]
     )
     # The card is loaded on every dashboard so it appears in the card picker
     # without any manual resource configuration.

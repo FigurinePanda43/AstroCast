@@ -65,8 +65,18 @@ def http_headers() -> dict[str, str]:
 def _elements_to_dict(items: list[OrbitalElements]) -> list[dict[str, Any]]:
     return [
         {
-            "id": e.id, "name": e.name, "kind": e.kind, "q": e.q, "e": e.e, "i": e.i,
-            "node": e.node, "peri": e.peri, "tp": e.tp, "epoch": e.epoch, "h": e.h, "g": e.g,
+            "id": e.id,
+            "name": e.name,
+            "kind": e.kind,
+            "q": e.q,
+            "e": e.e,
+            "i": e.i,
+            "node": e.node,
+            "peri": e.peri,
+            "tp": e.tp,
+            "epoch": e.epoch,
+            "h": e.h,
+            "g": e.g,
         }
         for e in items
     ]
@@ -162,9 +172,7 @@ class AstroCastCoordinator(DataUpdateCoordinator[Forecast]):
 
     config_entry: AstroCastConfigEntry
 
-    def __init__(
-        self, hass: HomeAssistant, entry: ConfigEntry, shared: AstroCastShared
-    ) -> None:
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, shared: AstroCastShared) -> None:
         """Initialise."""
         super().__init__(
             hass,
@@ -236,7 +244,7 @@ class AstroCastCoordinator(DataUpdateCoordinator[Forecast]):
             status.record_failure(now, str(err))
             _LOGGER.debug("%s unavailable: %s", name, err)
             return False
-        except Exception as err:  # noqa: BLE001 - a provider must never break the update
+        except Exception as err:
             status.record_failure(now, f"{type(err).__name__}: {err}")
             _LOGGER.warning("Unexpected error from %s: %s", name, err, exc_info=True)
             return False
@@ -316,7 +324,9 @@ class AstroCastCoordinator(DataUpdateCoordinator[Forecast]):
             item["active"] = series is not None
             item["stale"] = status.stale(now)
             if series is not None:
-                item["data_until"] = datetime.fromtimestamp(series.times[-1], tz=now.tzinfo).isoformat()
+                item["data_until"] = datetime.fromtimestamp(
+                    series.times[-1], tz=now.tzinfo
+                ).isoformat()
                 if series.model_run:
                     item["model_run"] = series.model_run.isoformat()
             report[name] = item

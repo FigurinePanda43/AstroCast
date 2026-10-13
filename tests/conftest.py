@@ -8,10 +8,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from homeassistant.const import CONF_ELEVATION, CONF_LATITUDE, CONF_LONGITUDE
 from homeassistant.core import HomeAssistant
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
@@ -72,12 +71,11 @@ def mock_providers(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
         "https://api.met.no/weatherapi/locationforecast/2.0/complete",
         json=load_fixture("metno_complete.json"),
     )
-    aioclient_mock.get(
-        "https://api.open-meteo.com/v1/elevation", json={"elevation": [63.0]}
-    )
+    aioclient_mock.get("https://api.open-meteo.com/v1/elevation", json={"elevation": [63.0]})
 
     aioclient_mock.get(
-        "https://ssd-api.jpl.nasa.gov/sbdb_query.api?sb-kind=c", json=load_fixture("jpl_comets.json")
+        "https://ssd-api.jpl.nasa.gov/sbdb_query.api?sb-kind=c",
+        json=load_fixture("jpl_comets.json"),
     )
     aioclient_mock.get(
         "https://ssd-api.jpl.nasa.gov/sbdb_query.api?sb-kind=a",

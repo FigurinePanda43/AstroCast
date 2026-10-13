@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import (
     HomeAssistant,
@@ -16,6 +14,7 @@ from homeassistant.core import (
 )
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+import voluptuous as vol
 
 from .const import (
     ATTR_CONFIG_ENTRY_ID,
@@ -50,9 +49,7 @@ def get_coordinator(hass: HomeAssistant, entry_id: str) -> AstroCastCoordinator:
             translation_placeholders={"entry_id": entry_id},
         )
     if entry.state is not ConfigEntryState.LOADED:
-        raise ServiceValidationError(
-            translation_domain=DOMAIN, translation_key="entry_not_loaded"
-        )
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="entry_not_loaded")
     return entry.runtime_data
 
 
@@ -71,7 +68,10 @@ def resolve_object(coordinator: AstroCastCoordinator, query: str) -> str:
     if (obj := coordinator.shared.catalog.get(key)) is not None:
         return obj.id
     for elements in (*coordinator.shared.comets, *coordinator.shared.asteroids):
-        if lowered in (elements.id.lower(), elements.name.lower()) or lowered in elements.name.lower():
+        if (
+            lowered in (elements.id.lower(), elements.name.lower())
+            or lowered in elements.name.lower()
+        ):
             return elements.id
     raise ServiceValidationError(
         translation_domain=DOMAIN,
@@ -103,7 +103,12 @@ def object_visibility(coordinator: AstroCastCoordinator, object_id: str) -> dict
     for index, night in enumerate(forecast.nights[:WEATHER_NIGHTS]):
         weather = sample_weather(forecast.timeline, night.ephem)
         ctx = NightContext.build(
-            night.ephem, weather, site.sky_brightness, site.min_altitude, site.equipment, site.latitude
+            night.ephem,
+            weather,
+            site.sky_brightness,
+            site.min_altitude,
+            site.equipment,
+            site.latitude,
         )
         if object_id in PLANETS:
             obj = evaluate_planet(ctx, night.ephem.planets[object_id])
@@ -113,7 +118,11 @@ def object_visibility(coordinator: AstroCastCoordinator, object_id: str) -> dict
             obj = evaluate_catalog(ctx, Catalog([dso]))[0]
         else:
             elements = next(
-                (e for e in (*coordinator.shared.comets, *coordinator.shared.asteroids) if e.id == object_id),
+                (
+                    e
+                    for e in (*coordinator.shared.comets, *coordinator.shared.asteroids)
+                    if e.id == object_id
+                ),
                 None,
             )
             obj = evaluate_small_body(ctx, elements, observer, force=True) if elements else None

@@ -10,8 +10,7 @@ from typing import Any
 
 import numpy as np
 
-from . import scoring
-from . import weather as w
+from . import scoring, weather as w
 from .catalog import Catalog
 from .ephemeris import (
     ASTRONOMICAL,
@@ -225,7 +224,9 @@ class Planner:
         location = self.site.location
         for i, night in enumerate(wanted):
             if night not in self._nights:
-                self._nights[night] = compute_night(location, night, with_planets=i < WEATHER_NIGHTS)
+                self._nights[night] = compute_night(
+                    location, night, with_planets=i < WEATHER_NIGHTS
+                )
         return [self._nights[n] for n in wanted]
 
     def events(self, now: datetime, comets: Sequence[OrbitalElements]) -> list[AstroEvent]:
@@ -265,7 +266,9 @@ class Planner:
             night = NightForecast(
                 ephem=ephem,
                 weather=weather,
-                deep_sky=scoring.analyse_profile(ephem, weather, scoring.DEEP_SKY, sqm, site.threshold),
+                deep_sky=scoring.analyse_profile(
+                    ephem, weather, scoring.DEEP_SKY, sqm, site.threshold
+                ),
                 planetary=scoring.analyse_profile(
                     ephem, weather, scoring.PLANETARY, sqm, site.threshold
                 ),
@@ -304,6 +307,12 @@ class Planner:
                     reverse=True,
                 )
                 night.objects = ranked[:TOP_OBJECTS]
+                # Keep per-sample curves only where they are used (memory).
+                keep = {o.id for o in night.objects[:12]} | set(favorites)
+                for obj in dso:
+                    if obj.id not in keep:
+                        obj.altitudes = None
+                        obj.azimuths = None
             else:
                 wanted = [fid for fid in favorites if self.catalog.get(fid)]
                 if wanted:
@@ -356,7 +365,9 @@ class Planner:
                 None,
             )
             favorite_results.append(
-                FavoriteForecast(id=fid, tonight=fav_tonight.get(fid), nights=items, next_good=next_good)
+                FavoriteForecast(
+                    id=fid, tonight=fav_tonight.get(fid), nights=items, next_good=next_good
+                )
             )
 
         return Forecast(

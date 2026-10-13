@@ -36,45 +36,100 @@ EQUIPMENT_LIMIT = {
 # How much each object type suits a kind of equipment (0-1).
 AFFINITY: dict[str, dict[str, float]] = {
     "naked_eye": {
-        "open_cluster": 1.0, "asterism": 1.0, "galaxy": 0.7, "globular_cluster": 0.6,
-        "cluster_nebula": 0.8, "emission_nebula": 0.5, "nebula": 0.5, "planetary_nebula": 0.2,
-        "reflection_nebula": 0.3, "supernova_remnant": 0.2, "dark_nebula": 0.3,
-        "galaxy_group": 0.1, "double_star": 0.3,
+        "open_cluster": 1.0,
+        "asterism": 1.0,
+        "galaxy": 0.7,
+        "globular_cluster": 0.6,
+        "cluster_nebula": 0.8,
+        "emission_nebula": 0.5,
+        "nebula": 0.5,
+        "planetary_nebula": 0.2,
+        "reflection_nebula": 0.3,
+        "supernova_remnant": 0.2,
+        "dark_nebula": 0.3,
+        "galaxy_group": 0.1,
+        "double_star": 0.3,
     },
     "binoculars": {
-        "open_cluster": 1.0, "asterism": 1.0, "galaxy": 0.8, "globular_cluster": 0.85,
-        "cluster_nebula": 0.95, "emission_nebula": 0.75, "nebula": 0.7, "planetary_nebula": 0.5,
-        "reflection_nebula": 0.5, "supernova_remnant": 0.5, "dark_nebula": 0.5,
-        "galaxy_group": 0.3, "double_star": 0.6,
+        "open_cluster": 1.0,
+        "asterism": 1.0,
+        "galaxy": 0.8,
+        "globular_cluster": 0.85,
+        "cluster_nebula": 0.95,
+        "emission_nebula": 0.75,
+        "nebula": 0.7,
+        "planetary_nebula": 0.5,
+        "reflection_nebula": 0.5,
+        "supernova_remnant": 0.5,
+        "dark_nebula": 0.5,
+        "galaxy_group": 0.3,
+        "double_star": 0.6,
     },
     "telescope": {
-        "open_cluster": 0.85, "asterism": 0.6, "galaxy": 1.0, "globular_cluster": 1.0,
-        "cluster_nebula": 1.0, "emission_nebula": 0.9, "nebula": 0.9, "planetary_nebula": 1.0,
-        "reflection_nebula": 0.8, "supernova_remnant": 0.8, "dark_nebula": 0.4,
-        "galaxy_group": 0.85, "double_star": 0.9,
+        "open_cluster": 0.85,
+        "asterism": 0.6,
+        "galaxy": 1.0,
+        "globular_cluster": 1.0,
+        "cluster_nebula": 1.0,
+        "emission_nebula": 0.9,
+        "nebula": 0.9,
+        "planetary_nebula": 1.0,
+        "reflection_nebula": 0.8,
+        "supernova_remnant": 0.8,
+        "dark_nebula": 0.4,
+        "galaxy_group": 0.85,
+        "double_star": 0.9,
     },
     "astrophotography": {
-        "open_cluster": 0.6, "asterism": 0.4, "galaxy": 1.0, "globular_cluster": 0.85,
-        "cluster_nebula": 1.0, "emission_nebula": 1.0, "nebula": 1.0, "planetary_nebula": 0.85,
-        "reflection_nebula": 1.0, "supernova_remnant": 1.0, "dark_nebula": 0.9,
-        "galaxy_group": 0.9, "double_star": 0.2,
+        "open_cluster": 0.6,
+        "asterism": 0.4,
+        "galaxy": 1.0,
+        "globular_cluster": 0.85,
+        "cluster_nebula": 1.0,
+        "emission_nebula": 1.0,
+        "nebula": 1.0,
+        "planetary_nebula": 0.85,
+        "reflection_nebula": 1.0,
+        "supernova_remnant": 1.0,
+        "dark_nebula": 0.9,
+        "galaxy_group": 0.9,
+        "double_star": 0.2,
     },
 }
 
 # Diffuse objects look fainter than their integrated magnitude suggests.
 DIFFUSE_PENALTY = {
-    "open_cluster": -0.5, "asterism": -0.5, "globular_cluster": 0.5, "planetary_nebula": 0.3,
-    "emission_nebula": 1.0, "nebula": 1.0, "reflection_nebula": 1.2, "supernova_remnant": 1.5,
-    "cluster_nebula": 0.5, "dark_nebula": 2.0, "galaxy_group": 1.0, "double_star": 0.0,
+    "open_cluster": -0.5,
+    "asterism": -0.5,
+    "globular_cluster": 0.5,
+    "planetary_nebula": 0.3,
+    "emission_nebula": 1.0,
+    "nebula": 1.0,
+    "reflection_nebula": 1.2,
+    "supernova_remnant": 1.5,
+    "cluster_nebula": 0.5,
+    "dark_nebula": 2.0,
+    "galaxy_group": 1.0,
+    "double_star": 0.0,
 }
 
 # Sensitivity of an object type to moonlight (exponent of the moon factor).
 MOON_SENSITIVITY = {
-    "galaxy": 1.0, "galaxy_group": 1.0, "emission_nebula": 1.0, "nebula": 1.0,
-    "reflection_nebula": 1.0, "supernova_remnant": 1.0, "dark_nebula": 1.0,
-    "cluster_nebula": 0.8, "planetary_nebula": 0.6, "globular_cluster": 0.7,
-    "open_cluster": 0.45, "asterism": 0.4, "double_star": 0.2,
-    "comet": 1.0, "asteroid": 0.5,
+    "galaxy": 1.0,
+    "galaxy_group": 1.0,
+    "emission_nebula": 1.0,
+    "nebula": 1.0,
+    "reflection_nebula": 1.0,
+    "supernova_remnant": 1.0,
+    "dark_nebula": 1.0,
+    "cluster_nebula": 0.8,
+    "planetary_nebula": 0.6,
+    "globular_cluster": 0.7,
+    "open_cluster": 0.45,
+    "asterism": 0.4,
+    "double_star": 0.2,
+    "comet": 1.0,
+    "asteroid": 0.5,
 }
 
 PLANET_NAMES = ("mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune")
@@ -120,6 +175,7 @@ class ObjectNight:
     moon_separation: float | None = None
     reasons: list[dict[str, Any]] = field(default_factory=list)
     altitudes: np.ndarray | None = None
+    azimuths: np.ndarray | None = None
     scores: np.ndarray | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -129,7 +185,9 @@ class ObjectNight:
         return self.interest >= 30 and self.best_score >= 35
 
 
-def _window(scores: np.ndarray, times: list[datetime]) -> tuple[datetime | None, datetime | None, int, int]:
+def _window(
+    scores: np.ndarray, times: list[datetime]
+) -> tuple[datetime | None, datetime | None, int, int]:
     if scores.size == 0 or float(np.max(scores)) <= 0:
         return None, None, 0, -1
     best = int(np.argmax(scores))
@@ -173,7 +231,9 @@ class NightContext:
         """Pre-compute sky factors for the night."""
         usable = ephem.sun_alt < -12.0
         has_weather = bool(np.any(weather.has_weather[usable])) if np.any(usable) else False
-        deep = scoring.sky_factors(ephem, weather, scoring.DEEP_SKY, sqm, assume_clear=not has_weather)
+        deep = scoring.sky_factors(
+            ephem, weather, scoring.DEEP_SKY, sqm, assume_clear=not has_weather
+        )
         planetary = scoring.sky_factors(
             ephem, weather, scoring.PLANETARY, sqm, assume_clear=not has_weather
         )
@@ -182,21 +242,43 @@ class NightContext:
         seeing = weather.get("seeing")
         seeing = np.where(np.isnan(seeing), scoring.DEFAULT_SEEING, seeing)
         return cls(
-            ephem, weather, sqm, min_alt, equipment, latitude, has_weather, deep, planetary, ext, seeing
+            ephem,
+            weather,
+            sqm,
+            min_alt,
+            equipment,
+            latitude,
+            has_weather,
+            deep,
+            planetary,
+            ext,
+            seeing,
         )
 
     def deep_base(self) -> np.ndarray:
         """Deep-sky sky factors except the (object-specific) moon factor."""
         f = self.deep
         return (
-            f["clouds"] * f["precipitation"] * f["darkness"] * f["transparency"]
-            * f["seeing"] * f["wind"] * f["humidity"]
+            f["clouds"]
+            * f["precipitation"]
+            * f["darkness"]
+            * f["transparency"]
+            * f["seeing"]
+            * f["wind"]
+            * f["humidity"]
         )
 
     def planetary_base(self) -> np.ndarray:
         """Planetary sky factors except seeing (altitude-dependent)."""
         f = self.planetary
-        return f["clouds"] * f["precipitation"] * f["darkness"] * f["transparency"] * f["wind"] * f["humidity"]
+        return (
+            f["clouds"]
+            * f["precipitation"]
+            * f["darkness"]
+            * f["transparency"]
+            * f["wind"]
+            * f["humidity"]
+        )
 
 
 def _altitude_factor(alt: np.ndarray, extinction: np.ndarray, min_alt: float) -> np.ndarray:
@@ -228,7 +310,7 @@ def evaluate_catalog(
     scores = 100.0 * ctx.deep_base()[None, :] * f_moon * f_alt
     dark = ctx.deep["darkness"] > 0.5
     return [
-        _summarise_dso(ctx, obj, alt[i], scores[i], moon_sep[i], dark, f_moon[i], language)
+        _summarise_dso(ctx, obj, alt[i], az[i], scores[i], moon_sep[i], dark, f_moon[i], language)
         for i, obj in enumerate(catalog.objects)
     ]
 
@@ -237,6 +319,7 @@ def _summarise_dso(
     ctx: NightContext,
     obj: DeepSkyObject,
     alt: np.ndarray,
+    az: np.ndarray,
     scores: np.ndarray,
     moon_sep: np.ndarray,
     dark: np.ndarray,
@@ -254,7 +337,7 @@ def _summarise_dso(
         mag=obj.mag,
         size=obj.size,
     )
-    _fill_visibility(result, ephem, alt, dark, ctx.min_alt)
+    _fill_visibility(result, ephem, alt, dark, ctx.min_alt, az)
     start, end, best_score, best = _window(scores, ephem.times)
     result.window_start, result.window_end, result.best_score = start, end, best_score
     if best >= 0:
@@ -301,7 +384,12 @@ def _summarise_dso(
 
 
 def _fill_visibility(
-    result: ObjectNight, ephem: NightEphemeris, alt: np.ndarray, dark: np.ndarray, min_alt: float
+    result: ObjectNight,
+    ephem: NightEphemeris,
+    alt: np.ndarray,
+    dark: np.ndarray,
+    min_alt: float,
+    az: np.ndarray | None = None,
 ) -> None:
     visible = dark & (alt >= min_alt)
     result.hours_visible = float(np.count_nonzero(visible)) * STEP_MINUTES / 60.0
@@ -313,6 +401,7 @@ def _fill_visibility(
     if 0 < peak < len(alt) - 1:
         result.transit = ephem.times[peak]
     result.altitudes = alt
+    result.azimuths = az
 
 
 def evaluate_planet(ctx: NightContext, track: BodyTrack) -> ObjectNight:
@@ -322,7 +411,9 @@ def evaluate_planet(ctx: NightContext, track: BodyTrack) -> ObjectNight:
     x = airmass(alt)
     eff_seeing = ctx.seeing * x**0.6
     f_seeing = scoring.seeing_factor(eff_seeing, scoring.PLANETARY)
-    f_alt = _altitude_factor(alt, ctx.extinction, max(ctx.min_alt, 5.0 if track.key == "moon" else ctx.min_alt))
+    f_alt = _altitude_factor(
+        alt, ctx.extinction, max(ctx.min_alt, 5.0 if track.key == "moon" else ctx.min_alt)
+    )
     scores = 100.0 * ctx.planetary_base() * f_seeing * f_alt
     kind = "moon" if track.key == "moon" else "planet"
     result = ObjectNight(
@@ -338,7 +429,7 @@ def evaluate_planet(ctx: NightContext, track: BodyTrack) -> ObjectNight:
         set=track.set,
     )
     dark = ctx.planetary["darkness"] > 0.5
-    _fill_visibility(result, ephem, alt, dark, ctx.min_alt)
+    _fill_visibility(result, ephem, alt, dark, ctx.min_alt, track.az)
     result.transit = track.transit
     start, end, best_score, best = _window(scores, ephem.times)
     result.window_start, result.window_end, result.best_score = start, end, best_score
@@ -369,8 +460,10 @@ def evaluate_planet(ctx: NightContext, track: BodyTrack) -> ObjectNight:
             reasons.append({"key": "near_opposition"})
         if track.key in ("mercury", "venus") and abs(track.elongation) >= 15:
             reasons.append(
-                {"key": "evening_sky" if track.elongation > 0 else "morning_sky",
-                 "elong": round(abs(track.elongation))}
+                {
+                    "key": "evening_sky" if track.elongation > 0 else "morning_sky",
+                    "elong": round(abs(track.elongation)),
+                }
             )
     if track.phase_fraction is not None and track.key in ("moon", "venus", "mercury"):
         result.extra["phase"] = round(track.phase_fraction * 100)
@@ -387,6 +480,20 @@ def evaluate_planet(ctx: NightContext, track: BodyTrack) -> ObjectNight:
     return result
 
 
+_POSITION_CACHE: dict[tuple[str, float, float, float, float], Any] = {}
+
+
+def _cached_position(elements: OrbitalElements, moment: datetime, observer: Any) -> Any:
+    """Small-body positions only depend on the date: cache them per night."""
+    key = (elements.id, elements.tp, moment.timestamp(), observer.latitude, observer.longitude)
+    found = _POSITION_CACHE.get(key)
+    if found is None:
+        if len(_POSITION_CACHE) > 20000:
+            _POSITION_CACHE.clear()
+        found = _POSITION_CACHE[key] = position(elements, moment, observer)
+    return found
+
+
 def evaluate_small_body(
     ctx: NightContext, elements: OrbitalElements, observer: Any, force: bool = False
 ) -> ObjectNight | None:
@@ -396,7 +503,7 @@ def evaluate_small_body(
     (favourites are always evaluated).
     """
     ephem = ctx.ephem
-    pos = position(elements, ephem.midnight, observer)
+    pos = _cached_position(elements, ephem.midnight, observer)
     if pos.mag is None:
         return None
     lm = limiting_magnitude(ctx.equipment, ctx.sqm)
@@ -409,7 +516,9 @@ def evaluate_small_body(
     alt, az = altaz(ra, dec, ephem.lst_deg, ctx.latitude)
     alt, az = alt[0], az[0]
     moon_sep = angular_separation(alt, az, ephem.moon_alt, ephem.moon_az)
-    delta = moon_brightening_mag(ctx.sqm, ephem.moon_phase_angle, moon_sep, ephem.moon_alt, alt, ctx.extinction)
+    delta = moon_brightening_mag(
+        ctx.sqm, ephem.moon_phase_angle, moon_sep, ephem.moon_alt, alt, ctx.extinction
+    )
     f_moon = scoring.moon_factor(delta, MOON_SENSITIVITY["comet" if is_comet else "asteroid"])
     scores = 100.0 * ctx.deep_base() * f_moon * _altitude_factor(alt, ctx.extinction, ctx.min_alt)
     result = ObjectNight(
@@ -422,7 +531,7 @@ def evaluate_small_body(
         mag=round(pos.mag, 1),
     )
     dark = ctx.deep["darkness"] > 0.5
-    _fill_visibility(result, ephem, alt, dark, ctx.min_alt)
+    _fill_visibility(result, ephem, alt, dark, ctx.min_alt, az)
     start, end, best_score, best = _window(scores, ephem.times)
     result.window_start, result.window_end, result.best_score = start, end, best_score
     if best >= 0:
