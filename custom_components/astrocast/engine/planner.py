@@ -56,6 +56,7 @@ class SiteConfig:
     min_altitude: float = 20.0
     equipment: str = "small_telescope"
     threshold: int = 60
+    horizon: tuple[tuple[float, float], ...] = ()
 
     @property
     def location(self) -> Location:
@@ -278,7 +279,13 @@ class Planner:
             if index >= WEATHER_NIGHTS:
                 continue
             ctx = NightContext.build(
-                ephem, weather, sqm, site.min_altitude, site.equipment, site.latitude
+                ephem,
+                weather,
+                sqm,
+                site.min_altitude,
+                site.equipment,
+                site.latitude,
+                site.horizon,
             )
             by_id: dict[str, ObjectNight] = {}
             if index < OBJECT_NIGHTS:

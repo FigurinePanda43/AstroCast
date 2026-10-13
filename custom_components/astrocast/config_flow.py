@@ -33,6 +33,7 @@ from .const import (
     CONF_BORTLE,
     CONF_EQUIPMENT,
     CONF_FAVORITES,
+    CONF_HORIZON,
     CONF_LOCATION,
     CONF_MIN_ALTITUDE,
     CONF_SHOW_PANEL,
@@ -48,6 +49,7 @@ from .const import (
 )
 from .coordinator import http_headers
 from .engine.ephemeris import PLANETS
+from .engine.horizon import HorizonError, format_horizon, parse_horizon
 from .i18n import body_name, lang_of
 from .providers.open_meteo import fetch_elevation
 
@@ -294,8 +296,20 @@ class AstroCastOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Manage options."""
         options = dict(self.config_entry.options)
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(data=_normalise_options(user_input))
+            data = _normalise_options(user_input)
+            try:
+                horizon = parse_horizon(data.get(CONF_HORIZON))
+            except HorizonError:
+                errors[CONF_HORIZON] = "invalid_horizon"
+            else:
+                if horizon:
+                    data[CONF_HORIZON] = format_horizon(horizon)
+                else:
+                    data.pop(CONF_HORIZON, None)
+                return self.async_create_entry(data=data)
+            options.update(user_input)
         favorites = list(options.get(CONF_FAVORITES, []))
         sqm = options.get(CONF_SQM)
         schema: dict[Any, Any] = _preferences_schema(options)
@@ -310,6 +324,12 @@ class AstroCastOptionsFlow(OptionsFlow):
                 )
             )
         )
+        horizon = options.get(CONF_HORIZON)
+        schema[
+            vol.Optional(
+                CONF_HORIZON, description={"suggested_value": horizon} if horizon else None
+            )
+        ] = TextSelector()
         schema[vol.Optional(CONF_FAVORITES, default=favorites)] = SelectSelector(
             SelectSelectorConfig(
                 options=favorite_options(self.hass, favorites),
@@ -321,4 +341,4 @@ class AstroCastOptionsFlow(OptionsFlow):
         schema[
             vol.Required(CONF_SHOW_PANEL, default=options.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL))
         ] = BooleanSelector()
-        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema))
+        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema), errors=errors)

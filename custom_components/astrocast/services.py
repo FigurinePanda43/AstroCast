@@ -109,6 +109,7 @@ def object_visibility(coordinator: AstroCastCoordinator, object_id: str) -> dict
             site.min_altitude,
             site.equipment,
             site.latitude,
+            site.horizon,
         )
         if object_id in PLANETS:
             obj = evaluate_planet(ctx, night.ephem.planets[object_id])

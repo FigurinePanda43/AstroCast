@@ -26,6 +26,7 @@ CONF_EQUIPMENT: Final = "equipment"
 CONF_THRESHOLD: Final = "threshold"
 CONF_FAVORITES: Final = "favorites"
 CONF_SHOW_PANEL: Final = "show_panel"
+CONF_HORIZON: Final = "horizon"
 
 DEFAULT_BORTLE: Final = 4
 DEFAULT_MIN_ALTITUDE: Final = 20

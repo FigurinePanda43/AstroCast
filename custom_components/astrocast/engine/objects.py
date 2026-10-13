@@ -19,6 +19,7 @@ import numpy as np
 from . import scoring
 from .catalog import Catalog, DeepSkyObject
 from .ephemeris import STEP_MINUTES, BodyTrack, NightEphemeris
+from .horizon import altitude_limit
 from .positions import altaz, angular_separation, precess
 from .skyglow import airmass, moon_brightening_mag
 from .smallbodies import OrbitalElements, position
@@ -217,6 +218,7 @@ class NightContext:
     planetary: dict[str, np.ndarray]
     extinction: np.ndarray
     seeing: np.ndarray
+    horizon: tuple[tuple[float, float], ...] = ()
 
     @classmethod
     def build(
@@ -227,6 +229,7 @@ class NightContext:
         min_alt: float,
         equipment: str,
         latitude: float,
+        horizon: tuple[tuple[float, float], ...] = (),
     ) -> NightContext:
         """Pre-compute sky factors for the night."""
         usable = ephem.sun_alt < -12.0
@@ -253,7 +256,12 @@ class NightContext:
             planetary,
             ext,
             seeing,
+            horizon,
         )
+
+    def limit(self, az: np.ndarray, floor: float | None = None) -> np.ndarray:
+        """Lowest usable altitude at the given azimuths (horizon profile)."""
+        return altitude_limit(self.horizon, az, self.min_alt if floor is None else floor)
 
     def deep_base(self) -> np.ndarray:
         """Deep-sky sky factors except the (object-specific) moon factor."""
@@ -281,7 +289,9 @@ class NightContext:
         )
 
 
-def _altitude_factor(alt: np.ndarray, extinction: np.ndarray, min_alt: float) -> np.ndarray:
+def _altitude_factor(
+    alt: np.ndarray, extinction: np.ndarray, min_alt: float | np.ndarray
+) -> np.ndarray:
     """Extinction loss with airmass, and the user's horizon limit."""
     x = airmass(alt)
     loss = 10.0 ** (-0.2 * (extinction + 0.1) * (x - 1.0))
@@ -306,11 +316,14 @@ def evaluate_catalog(
     )
     sens = np.array([MOON_SENSITIVITY.get(o.type, 1.0) for o in catalog.objects])[:, None]
     f_moon = scoring.moon_factor(delta, sens)
-    f_alt = _altitude_factor(alt, ctx.extinction[None, :], ctx.min_alt)
+    limit = ctx.limit(az)
+    f_alt = _altitude_factor(alt, ctx.extinction[None, :], limit)
     scores = 100.0 * ctx.deep_base()[None, :] * f_moon * f_alt
     dark = ctx.deep["darkness"] > 0.5
     return [
-        _summarise_dso(ctx, obj, alt[i], az[i], scores[i], moon_sep[i], dark, f_moon[i], language)
+        _summarise_dso(
+            ctx, obj, alt[i], az[i], scores[i], moon_sep[i], dark, f_moon[i], limit[i], language
+        )
         for i, obj in enumerate(catalog.objects)
     ]
 
@@ -324,6 +337,7 @@ def _summarise_dso(
     moon_sep: np.ndarray,
     dark: np.ndarray,
     f_moon: np.ndarray,
+    limit: np.ndarray,
     language: str,
 ) -> ObjectNight:
     ephem = ctx.ephem
@@ -337,7 +351,7 @@ def _summarise_dso(
         mag=obj.mag,
         size=obj.size,
     )
-    _fill_visibility(result, ephem, alt, dark, ctx.min_alt, az)
+    _fill_visibility(result, ephem, alt, dark, limit, az)
     start, end, best_score, best = _window(scores, ephem.times)
     result.window_start, result.window_end, result.best_score = start, end, best_score
     if best >= 0:
@@ -388,7 +402,7 @@ def _fill_visibility(
     ephem: NightEphemeris,
     alt: np.ndarray,
     dark: np.ndarray,
-    min_alt: float,
+    min_alt: float | np.ndarray,
     az: np.ndarray | None = None,
 ) -> None:
     visible = dark & (alt >= min_alt)
@@ -411,9 +425,8 @@ def evaluate_planet(ctx: NightContext, track: BodyTrack) -> ObjectNight:
     x = airmass(alt)
     eff_seeing = ctx.seeing * x**0.6
     f_seeing = scoring.seeing_factor(eff_seeing, scoring.PLANETARY)
-    f_alt = _altitude_factor(
-        alt, ctx.extinction, max(ctx.min_alt, 5.0 if track.key == "moon" else ctx.min_alt)
-    )
+    limit = ctx.limit(track.az, max(ctx.min_alt, 5.0) if track.key == "moon" else None)
+    f_alt = _altitude_factor(alt, ctx.extinction, limit)
     scores = 100.0 * ctx.planetary_base() * f_seeing * f_alt
     kind = "moon" if track.key == "moon" else "planet"
     result = ObjectNight(
@@ -429,7 +442,7 @@ def evaluate_planet(ctx: NightContext, track: BodyTrack) -> ObjectNight:
         set=track.set,
     )
     dark = ctx.planetary["darkness"] > 0.5
-    _fill_visibility(result, ephem, alt, dark, ctx.min_alt, track.az)
+    _fill_visibility(result, ephem, alt, dark, limit, track.az)
     result.transit = track.transit
     start, end, best_score, best = _window(scores, ephem.times)
     result.window_start, result.window_end, result.best_score = start, end, best_score
@@ -520,7 +533,8 @@ def evaluate_small_body(
         ctx.sqm, ephem.moon_phase_angle, moon_sep, ephem.moon_alt, alt, ctx.extinction
     )
     f_moon = scoring.moon_factor(delta, MOON_SENSITIVITY["comet" if is_comet else "asteroid"])
-    scores = 100.0 * ctx.deep_base() * f_moon * _altitude_factor(alt, ctx.extinction, ctx.min_alt)
+    limit = ctx.limit(az)
+    scores = 100.0 * ctx.deep_base() * f_moon * _altitude_factor(alt, ctx.extinction, limit)
     result = ObjectNight(
         id=elements.id,
         kind=elements.kind,
@@ -531,7 +545,7 @@ def evaluate_small_body(
         mag=round(pos.mag, 1),
     )
     dark = ctx.deep["darkness"] > 0.5
-    _fill_visibility(result, ephem, alt, dark, ctx.min_alt, az)
+    _fill_visibility(result, ephem, alt, dark, limit, az)
     start, end, best_score, best = _window(scores, ephem.times)
     result.window_start, result.window_end, result.best_score = start, end, best_score
     if best >= 0:

@@ -59,14 +59,19 @@
           "min_altitude": "Hauteur minimale utilisable",
           "threshold": "Seuil de « bonnes conditions »",
           "favorites": "Objets favoris",
-          "show_panel": "Afficher AstroCast dans la barre latérale"
+          "show_panel": "Afficher AstroCast dans la barre latérale",
+          "horizon": "Profil d'horizon (facultatif)"
         },
         "data_description": {
           "sqm": "Si vous possédez un Sky Quality Meter, sa mesure au zénith remplace la classe de Bortle.",
           "favorites": "Chaque favori dispose d'un capteur indiquant sa prochaine fenêtre d'observation favorable.",
-          "show_panel": "Ajoute un tableau de bord AstroCast dans la barre latérale (commun à tous les sites)."
+          "show_panel": "Ajoute un tableau de bord AstroCast dans la barre latérale (commun à tous les sites).",
+          "horizon": "Obstacles sous forme de couples azimut:hauteur en degrés, par ex. « 0:15, 90:30, 180:10, 270:25 » (nord = 0, est = 90). Les objets masqués sont ignorés."
         }
       }
+    },
+    "error": {
+      "invalid_horizon": "Profil d'horizon invalide : utilisez des couples azimut:hauteur comme « 0:15, 90:30, 180:10 »."
     }
   },
   "selector": {

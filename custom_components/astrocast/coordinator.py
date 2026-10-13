@@ -21,6 +21,7 @@ from .const import (
     CONF_BORTLE,
     CONF_EQUIPMENT,
     CONF_FAVORITES,
+    CONF_HORIZON,
     CONF_MIN_ALTITUDE,
     CONF_SQM,
     CONF_THRESHOLD,
@@ -41,6 +42,7 @@ from .const import (
     VERSION,
 )
 from .engine.catalog import Catalog, load_catalog
+from .engine.horizon import HorizonError, parse_horizon
 from .engine.planner import Forecast, Planner, SiteConfig
 from .engine.smallbodies import OrbitalElements
 from .engine.weather import WeatherSeries, build_timeline
@@ -154,6 +156,11 @@ def site_config(entry: ConfigEntry) -> SiteConfig:
     """Build the engine configuration from a config entry."""
     options = entry.options
     sqm = options.get(CONF_SQM)
+    try:
+        horizon = parse_horizon(options.get(CONF_HORIZON))
+    except HorizonError:
+        _LOGGER.warning("Ignoring invalid horizon profile for %s", entry.title)
+        horizon = ()
     return SiteConfig(
         name=entry.title,
         latitude=float(entry.data[CONF_LATITUDE]),
@@ -164,6 +171,7 @@ def site_config(entry: ConfigEntry) -> SiteConfig:
         min_altitude=float(options.get(CONF_MIN_ALTITUDE, DEFAULT_MIN_ALTITUDE)),
         equipment=str(options.get(CONF_EQUIPMENT, DEFAULT_EQUIPMENT)),
         threshold=int(options.get(CONF_THRESHOLD, DEFAULT_THRESHOLD)),
+        horizon=horizon,
     )
 
 
