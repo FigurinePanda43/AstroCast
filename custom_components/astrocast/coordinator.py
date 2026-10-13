@@ -45,6 +45,7 @@ from .engine.catalog import Catalog, load_catalog
 from .engine.horizon import HorizonError, parse_horizon
 from .engine.planner import Forecast, Planner, SiteConfig
 from .engine.smallbodies import OrbitalElements
+from .engine.timeutil import night_date_for, night_window
 from .engine.weather import WeatherSeries, build_timeline
 from .providers import jpl, metno, open_meteo, seventimer
 from .providers.base import USER_AGENT, ProviderError, ProviderStatus
@@ -312,7 +313,8 @@ class AstroCastCoordinator(DataUpdateCoordinator[Forecast]):
             await self._async_restore()
         await self._async_refresh_weather(now)
         comets, asteroids = await self.shared.async_small_bodies(now)
-        timeline = build_timeline(self.series, now, self.site.elevation)
+        night_start = night_window(night_date_for(now, self.site.longitude), self.site.longitude)[0]
+        timeline = build_timeline(self.series, now, self.site.elevation, start=night_start)
         async with self._compute_lock:
             try:
                 return await self.hass.async_add_executor_job(

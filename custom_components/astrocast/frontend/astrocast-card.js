@@ -577,6 +577,7 @@ class AstroCastView extends HTMLElement {
   _subscribe(entryId) {
     const key = `${entryId || "auto"}|${this.lang}`;
     if (!this._hass || this._subscribedFor === key) return;
+    if (this._retryAfter && Date.now() < this._retryAfter) return;
     this._unsubscribe();
     this._subscribedFor = key;
     const msg = { type: "astrocast/subscribe", language: this.lang };
@@ -585,9 +586,14 @@ class AstroCastView extends HTMLElement {
       .subscribeMessage((data) => {
         this._data = data;
         this._error = null;
+        // Details fetched on demand belong to the previous forecast.
+        this._objectDetails = {};
+        if (!data.nights[this._nightIndex]?.samples) this._nightIndex = 0;
         this._render();
       }, msg)
       .catch((err) => {
+        // Retry later rather than on every Home Assistant state change.
+        this._retryAfter = Date.now() + 60000;
         this._subscribedFor = null;
         this._error = err?.message || String(err);
         this._render();
@@ -812,7 +818,7 @@ class AstroCastView extends HTMLElement {
 
   _tonightTab() {
     const night = this._data.nights[this._nightIndex] || this._data.nights[0];
-    if (!night.samples) return `<div class="empty">—</div>`;
+    if (!night.samples) return `${this._nightSelector()}<div class="empty">—</div>`;
     return `${this._nightSelector()}${this._timeline(night)}${this._inspectPanel(night)}`;
   }
 
@@ -897,13 +903,16 @@ class AstroCastView extends HTMLElement {
 
     // Time axis on whole local hours (every 1, 2 or 3 hours depending on width).
     const fmt = new Intl.DateTimeFormat(this.lang, { hour: "2-digit", minute: "2-digit", timeZone: this.timeZone });
-    const hourOf = new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: this.timeZone });
+    const clock = new Intl.DateTimeFormat("en-GB", { hour: "numeric", minute: "numeric", hourCycle: "h23", timeZone: this.timeZone });
     const spanHours = ((n - 1) * step) / 3600000;
     const every = W / spanHours > 55 ? 1 : W / spanHours > 30 ? 2 : 3;
-    const firstHour = Math.ceil(t0 / 3600000) * 3600000;
-    for (let t = firstHour; t <= t0 + (n - 1) * step; t += 3600000) {
+    // Walk in 15-minute steps and keep whole *local* hours (time zones may be
+    // offset by 30 or 45 minutes from UTC).
+    const firstQuarter = Math.ceil(t0 / 900000) * 900000;
+    for (let t = firstQuarter; t <= t0 + (n - 1) * step; t += 900000) {
       const date = new Date(t);
-      if (Number(hourOf.format(date)) % every !== 0) continue;
+      const local = Object.fromEntries(clock.formatToParts(date).map((p) => [p.type, p.value]));
+      if (Number(local.minute) !== 0 || Number(local.hour) % every !== 0) continue;
       const xi = x((t - t0) / step);
       if (xi < 16 || xi > W - 16) continue;
       parts.push(`<line x1="${xi}" x2="${xi}" y1="${plotBottom}" y2="${plotBottom + 4}" stroke="currentColor" stroke-opacity=".5"/>`);

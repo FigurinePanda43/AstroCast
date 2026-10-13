@@ -77,11 +77,11 @@ class AstronomicalNightSensor(AstroCastEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool | None:
         """Whether it is astronomical night."""
-        now = dt_util.utcnow()
-        intervals = self._intervals()
-        if not intervals:
+        if self.coordinator.data is None:
             return None
-        return any(start <= now < end for start, end in intervals)
+        now = dt_util.utcnow()
+        # No interval at all (e.g. summer at high latitude) simply means "off".
+        return any(start <= now < end for start, end in self._intervals())
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

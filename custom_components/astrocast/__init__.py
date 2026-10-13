@@ -11,6 +11,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
@@ -23,6 +24,7 @@ from .const import (
     PANEL_COMPONENT,
     PANEL_URL,
     PLATFORMS,
+    STORAGE_VERSION,
     URL_BASE,
     VERSION,
 )
@@ -80,6 +82,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: AstroCastConfigEntry) ->
         )
     )
     await _async_update_panel(hass, current=entry)
+    # Push the new forecast to open dashboards (e.g. after an options reload).
+    async_dispatcher_send(hass, signal_update(entry.entry_id))
     return True
 
 
@@ -89,6 +93,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: AstroCastConfigEntry) -
     if unloaded:
         await _async_update_panel(hass, removing=entry.entry_id)
     return unloaded
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Delete the cached weather of a removed site."""
+    await Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}").async_remove()
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: AstroCastConfigEntry) -> None:
@@ -102,7 +111,10 @@ async def _async_options_updated(hass: HomeAssistant, entry: AstroCastConfigEntr
     current = dict(entry.options)
     coordinator.options_snapshot = current
     changed = {k for k in {*previous, *current} if previous.get(k) != current.get(k)}
-    if changed and changed <= {CONF_FAVORITES}:
+    if not changed:
+        # Data/title updates come from the reconfigure flow, which reloads itself.
+        return
+    if changed <= {CONF_FAVORITES}:
         await _async_apply_favorites(hass, entry, previous.get(CONF_FAVORITES, []))
         return
     await hass.config_entries.async_reload(entry.entry_id)

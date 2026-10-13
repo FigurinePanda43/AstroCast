@@ -235,8 +235,18 @@ class AstroCastConfigFlow(ConfigFlow, domain=DOMAIN):
                     abs(latitude - entry.data[CONF_LATITUDE]) > 1e-4
                     or abs(longitude - entry.data[CONF_LONGITUDE]) > 1e-4
                 )
+                previous = entry.data.get(CONF_ELEVATION)
+                # The form pre-fills the old elevation: once the marker has moved,
+                # an unchanged value means "look it up again".
+                if (
+                    moved
+                    and elevation is not None
+                    and previous is not None
+                    and abs(float(elevation) - float(previous)) < 0.5
+                ):
+                    elevation = None
                 if elevation is None and not moved:
-                    elevation = entry.data.get(CONF_ELEVATION)
+                    elevation = previous
                 return self.async_update_reload_and_abort(
                     entry,
                     unique_id=self.unique_id,

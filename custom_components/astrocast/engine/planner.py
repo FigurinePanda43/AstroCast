@@ -224,7 +224,10 @@ class Planner:
                 del self._nights[night]
         location = self.site.location
         for i, night in enumerate(wanted):
-            if night not in self._nights:
+            cached = self._nights.get(night)
+            # A night cached beyond the planet window must be recomputed once it
+            # enters the window (it would otherwise lack planet tracks).
+            if cached is None or (i < WEATHER_NIGHTS and not cached.planets):
                 self._nights[night] = compute_night(
                     location, night, with_planets=i < WEATHER_NIGHTS
                 )

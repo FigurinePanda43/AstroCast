@@ -124,10 +124,13 @@ async def ws_subscribe(
     async def send() -> None:
         # Look the coordinator up again: the entry may have been reloaded.
         entry = hass.config_entries.async_get_entry(entry_id)
-        if entry is None or entry.state is not ConfigEntryState.LOADED:
+        if entry is None or entry.state not in (
+            ConfigEntryState.LOADED,
+            ConfigEntryState.SETUP_IN_PROGRESS,
+        ):
             return
-        current: AstroCastCoordinator = entry.runtime_data
-        if current.data is None:
+        current: AstroCastCoordinator | None = getattr(entry, "runtime_data", None)
+        if current is None or current.data is None:
             return
         payload = await hass.async_add_executor_job(_payload, hass, current, language)
         connection.send_message(websocket_api.event_message(msg_id, payload))
