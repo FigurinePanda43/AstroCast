@@ -8,13 +8,14 @@ coordinates include parallax, aberration, nutation and standard refraction.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 import math
 
 import astronomy
 import numpy as np
 
-from .timeutil import from_astro, night_window, to_astro
+from .skyglow import refraction_deg
+from .timeutil import J2000_UNIX, from_astro, night_window, to_astro
 
 STEP_MINUTES = 15
 SAMPLES_PER_NIGHT = 24 * 60 // STEP_MINUTES
@@ -185,36 +186,6 @@ def moon_phase_name(phase_deg: float) -> str:
     return "waning_crescent"
 
 
-def _search_altitude(
-    observer: astronomy.Observer,
-    direction: astronomy.Direction,
-    start: astronomy.Time,
-    end: datetime,
-    altitude: float,
-) -> datetime | None:
-    found = astronomy.SearchAltitude(
-        astronomy.Body.Sun, observer, direction, start, 1.0, altitude
-    )
-    if found is None:
-        return None
-    moment = from_astro(found)
-    return moment if moment < end else None
-
-
-def _search_rise_set(
-    body: astronomy.Body,
-    observer: astronomy.Observer,
-    direction: astronomy.Direction,
-    start: astronomy.Time,
-    end: datetime,
-) -> datetime | None:
-    found = astronomy.SearchRiseSet(body, observer, direction, start, 1.0)
-    if found is None:
-        return None
-    moment = from_astro(found)
-    return moment if moment < end else None
-
-
 def horizontal(
     body: astronomy.Body, time: astronomy.Time, observer: astronomy.Observer
 ) -> tuple[float, float]:
@@ -234,29 +205,112 @@ def local_sidereal_deg(time: astronomy.Time, longitude: float) -> float:
     return (astronomy.SiderealTime(time) * 15.0 + longitude) % 360.0
 
 
-def _body_track(
-    key: str,
-    observer: astronomy.Observer,
-    times: list[astronomy.Time],
-    midnight: astronomy.Time,
-    window_start: astronomy.Time,
-    window_end: datetime,
-) -> BodyTrack:
-    body = BODIES[key]
-    alt = np.empty(len(times))
-    az = np.empty(len(times))
-    for i, time in enumerate(times):
-        alt[i], az[i] = horizontal(body, time, observer)
+SIDEREAL_RATE = 360.98564736629  # degrees of sidereal time per UT day
+SUN_HORIZON = -0.8333  # refraction + solar semi-diameter (geometric altitude)
+PLANET_HORIZON = -0.5667  # refraction only
+MOON_HORIZON = -0.8333  # refraction + mean lunar semi-diameter (topocentric)
 
+# Spacing of the exact ephemeris evaluations that are interpolated in between.
+ANCHOR_HOURS = {"sun": 4.0, "moon": 1.0}
+DEFAULT_ANCHOR_HOURS = 12.0
+
+
+def equatorial_track(
+    body: astronomy.Body,
+    observer: astronomy.Observer,
+    unix: np.ndarray,
+    anchor_hours: float,
+) -> tuple[np.ndarray, np.ndarray, list[float]]:
+    """Topocentric RA/Dec of date (deg) interpolated from exact anchor points.
+
+    Bodies move smoothly: evaluating astronomy-engine every ``anchor_hours`` and
+    interpolating keeps the error far below 0.05° while being an order of
+    magnitude faster (important on small ARM boards).
+    """
+    t0, t1 = float(unix[0]), float(unix[-1])
+    count = max(2, int(math.ceil((t1 - t0) / (anchor_hours * 3600.0))) + 1)
+    anchors = np.linspace(t0, t1, count)
+    ras: list[float] = []
+    decs: list[float] = []
+    dists: list[float] = []
+    for ts in anchors:
+        equ = astronomy.Equator(
+            body, astronomy.Time((ts - J2000_UNIX) / 86400.0), observer, True, True
+        )
+        ras.append(equ.ra * 15.0)
+        decs.append(equ.dec)
+        dists.append(equ.dist)
+    ra_unwrapped = np.degrees(np.unwrap(np.radians(ras)))
+    ra = np.interp(unix, anchors, ra_unwrapped) % 360.0
+    dec = np.interp(unix, anchors, decs)
+    return ra, dec, dists
+
+
+def altaz_series(
+    ra_deg: np.ndarray, dec_deg: np.ndarray, lst_deg: np.ndarray, latitude: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Geometric altitude, apparent (refracted) altitude and azimuth (deg)."""
+    phi = math.radians(latitude)
+    ha = np.radians(lst_deg - ra_deg)
+    dec = np.radians(dec_deg)
+    sin_alt = math.sin(phi) * np.sin(dec) + math.cos(phi) * np.cos(dec) * np.cos(ha)
+    geometric = np.degrees(np.arcsin(np.clip(sin_alt, -1.0, 1.0)))
+    az = (
+        np.degrees(
+            np.arctan2(
+                -np.sin(ha) * np.cos(dec),
+                math.cos(phi) * np.sin(dec) - math.sin(phi) * np.cos(dec) * np.cos(ha),
+            )
+        )
+        % 360.0
+    )
+    return geometric, geometric + refraction_deg(geometric), az
+
+
+def crossings(unix: np.ndarray, values: np.ndarray, level: float) -> list[tuple[datetime, int]]:
+    """Times where ``values`` crosses ``level`` (+1 rising, -1 setting)."""
+    diff = values - level
+    result: list[tuple[datetime, int]] = []
+    for i in np.flatnonzero(np.sign(diff[:-1]) != np.sign(diff[1:])):
+        d0, d1 = diff[i], diff[i + 1]
+        if d0 == d1:
+            continue
+        frac = d0 / (d0 - d1)
+        ts = unix[i] + frac * (unix[i + 1] - unix[i])
+        result.append((datetime.fromtimestamp(float(ts), tz=UTC), 1 if d1 > d0 else -1))
+    return result
+
+
+def _first(
+    events: list[tuple[datetime, int]], direction: int, after: datetime | None = None
+) -> datetime | None:
+    for moment, sense in events:
+        if sense == direction and (after is None or moment > after):
+            return moment
+    return None
+
+
+def _transit(unix: np.ndarray, lst: np.ndarray, ra: np.ndarray) -> datetime | None:
+    """Upper culmination: hour angle crossing zero from negative to positive."""
+    ha = (lst - ra + 180.0) % 360.0 - 180.0
+    for i in range(len(ha) - 1):
+        if ha[i] < 0 <= ha[i + 1] and ha[i + 1] - ha[i] < 90:
+            frac = -ha[i] / (ha[i + 1] - ha[i])
+            return datetime.fromtimestamp(float(unix[i] + frac * (unix[i + 1] - unix[i])), tz=UTC)
+    return None
+
+
+def _body_info(key: str, observer: astronomy.Observer, midnight: astronomy.Time) -> BodyTrack:
+    """Physical data of a body at local midnight (brightness, size, elongation)."""
+    body = BODIES[key]
     equ = astronomy.Equator(body, midnight, observer, True, True)
     equ_j2000 = astronomy.Equator(body, midnight, observer, False, True)
     constellation = astronomy.Constellation(equ_j2000.ra, equ_j2000.dec).symbol
     diameter = 2.0 * math.atan(RADIUS_KM[key] / (equ.dist * KM_PER_AU)) * ARCSEC_PER_RAD
-
     track = BodyTrack(
         key=key,
-        alt=alt,
-        az=az,
+        alt=np.empty(0),
+        az=np.empty(0),
         ra_hours=equ.ra,
         dec=equ.dec,
         distance_au=equ.dist,
@@ -273,125 +327,108 @@ def _body_track(
         # Positive when the body is east of the Sun (evening sky).
         if astronomy.PairLongitude(body, astronomy.Body.Sun, midnight) > 180.0:
             track.elongation = -track.elongation
-    track.rise = _search_rise_set(
-        body, observer, astronomy.Direction.Rise, window_start, window_end
-    )
-    track.set = _search_rise_set(
-        body, observer, astronomy.Direction.Set, window_start, window_end
-    )
-    transit = astronomy.SearchHourAngle(body, observer, 0.0, window_start, 1)
-    transit_time = from_astro(transit.time)
-    if transit_time < window_end:
-        track.transit = transit_time
-        track.transit_alt = transit.hor.altitude
     return track
+
+
+def _fill_track(
+    track: BodyTrack,
+    observer: astronomy.Observer,
+    unix: np.ndarray,
+    lst: np.ndarray,
+    latitude: float,
+    horizon: float,
+) -> None:
+    ra, dec, _ = equatorial_track(
+        BODIES[track.key], observer, unix, ANCHOR_HOURS.get(track.key, DEFAULT_ANCHOR_HOURS)
+    )
+    geometric, apparent, az = altaz_series(ra, dec, lst, latitude)
+    track.alt = apparent
+    track.az = az
+    events = crossings(unix, geometric, horizon)
+    track.rise = _first(events, 1)
+    track.set = _first(events, -1)
+    track.transit = _transit(unix, lst, ra)
+    if track.transit is not None:
+        track.transit_alt = round(
+            90.0 - abs(latitude - float(np.interp(track.transit.timestamp(), unix, dec))), 2
+        )
 
 
 def compute_night(location: Location, night: date, with_planets: bool = True) -> NightEphemeris:
     """Compute the ephemeris of a night (local noon to local noon)."""
     observer = location.observer
     start, end = night_window(night, location.longitude)
+    # Align the sampling grid on whole quarter hours (nicer times for users).
+    start = start.replace(second=0, microsecond=0) - timedelta(minutes=start.minute % STEP_MINUTES)
+    end = start + timedelta(days=1)
     times = [start + timedelta(minutes=STEP_MINUTES * i) for i in range(SAMPLES_PER_NIGHT)]
-    atimes = [to_astro(t) for t in times]
+    unix = np.array([t.timestamp() for t in times])
     n = len(times)
+    astart = to_astro(start)
+    midnight = to_astro(start + timedelta(hours=12))
+    lst = (
+        local_sidereal_deg(astart, location.longitude) + SIDEREAL_RATE * (unix - unix[0]) / 86400.0
+    ) % 360.0
 
-    sun_alt = np.empty(n)
-    moon_alt = np.empty(n)
-    moon_az = np.empty(n)
-    moon_illum = np.empty(n)
-    moon_pa = np.empty(n)
-    lst = np.empty(n)
-    for i, time in enumerate(atimes):
-        sun_alt[i] = horizontal(astronomy.Body.Sun, time, observer)[0]
-        moon_alt[i], moon_az[i] = horizontal(astronomy.Body.Moon, time, observer)
-        lst[i] = local_sidereal_deg(time, location.longitude)
+    sun_ra, sun_dec, _ = equatorial_track(astronomy.Body.Sun, observer, unix, ANCHOR_HOURS["sun"])
+    sun_geo, _sun_app, _ = altaz_series(sun_ra, sun_dec, lst, location.latitude)
+
+    moon = _body_info("moon", observer, midnight)
+    _fill_track(moon, observer, unix, lst, location.latitude, MOON_HORIZON)
+
     # Lunar illumination changes slowly: evaluate every 3 hours and interpolate.
-    coarse = list(range(0, n, 12)) + [n - 1]
+    coarse = [*range(0, n, 12), n - 1]
     coarse_illum = []
     coarse_pa = []
     for idx in coarse:
-        illum = astronomy.Illumination(astronomy.Body.Moon, atimes[idx])
+        illum = astronomy.Illumination(astronomy.Body.Moon, to_astro(times[idx]))
         coarse_illum.append(illum.phase_fraction)
         coarse_pa.append(illum.phase_angle)
-    moon_illum[:] = np.interp(np.arange(n), coarse, coarse_illum)
-    moon_pa[:] = np.interp(np.arange(n), coarse, coarse_pa)
 
-    astart = atimes[0]
-    midnight = to_astro(start + timedelta(hours=12))
-    moon_track = _body_track("moon", observer, [], midnight, astart, end)
-    moon_track.alt = moon_alt
-    moon_track.az = moon_az
-
+    sun_events = crossings(unix, sun_geo, SUN_HORIZON)
+    sunset = _first(sun_events, -1)
     ephem = NightEphemeris(
         night=night,
         start=start,
         end=end,
         times=times,
-        unix=np.array([t.timestamp() for t in times]),
-        sun_alt=sun_alt,
-        moon_alt=moon_alt,
-        moon_az=moon_az,
-        moon_illum=moon_illum,
-        moon_phase_angle=moon_pa,
+        unix=unix,
+        sun_alt=sun_geo,
+        moon_alt=moon.alt,
+        moon_az=moon.az,
+        moon_illum=np.interp(np.arange(n), coarse, coarse_illum),
+        moon_phase_angle=np.interp(np.arange(n), coarse, coarse_pa),
         lst_deg=lst,
         precession=precession_matrix(midnight),
-        sunset=_search_rise_set(
-            astronomy.Body.Sun, observer, astronomy.Direction.Set, astart, end
-        ),
-        sunrise=None,
-        civil_dusk=_search_altitude(observer, astronomy.Direction.Set, astart, end, CIVIL),
+        sunset=sunset,
+        sunrise=_first(sun_events, 1, sunset),
+        civil_dusk=None,
         civil_dawn=None,
-        nautical_dusk=_search_altitude(
-            observer, astronomy.Direction.Set, astart, end, NAUTICAL
-        ),
+        nautical_dusk=None,
         nautical_dawn=None,
-        astro_dusk=_search_altitude(
-            observer, astronomy.Direction.Set, astart, end, ASTRONOMICAL
-        ),
+        astro_dusk=None,
         astro_dawn=None,
-        moonrise=moon_track.rise,
-        moonset=moon_track.set,
+        moonrise=moon.rise,
+        moonset=moon.set,
         moon_phase=astronomy.MoonPhase(midnight),
         moon_illumination=astronomy.Illumination(astronomy.Body.Moon, midnight).phase_fraction,
-        moon=moon_track,
+        moon=moon,
     )
-    # Morning events are searched from the evening event (or the window start)
-    # so that a morning event is always paired with the right evening.
-    ephem.sunrise = _search_rise_set(
-        astronomy.Body.Sun,
-        observer,
-        astronomy.Direction.Rise,
-        to_astro(ephem.sunset) if ephem.sunset else astart,
-        end,
-    )
+    # Morning events are paired with the evening event of the same night.
     for dusk_attr, dawn_attr, limit in (
         ("civil_dusk", "civil_dawn", CIVIL),
         ("nautical_dusk", "nautical_dawn", NAUTICAL),
         ("astro_dusk", "astro_dawn", ASTRONOMICAL),
     ):
-        dusk = getattr(ephem, dusk_attr)
-        setattr(
-            ephem,
-            dawn_attr,
-            _search_altitude(
-                observer,
-                astronomy.Direction.Rise,
-                to_astro(dusk) if dusk else astart,
-                end,
-                limit,
-            ),
-        )
+        events = crossings(unix, sun_geo, limit)
+        dusk = _first(events, -1)
+        setattr(ephem, dusk_attr, dusk)
+        setattr(ephem, dawn_attr, _first(events, 1, dusk))
 
     if with_planets:
-        night_idx = [i for i in range(n) if sun_alt[i] < 0.0]
         for key in PLANETS:
-            track = _body_track(key, observer, [], midnight, astart, end)
-            alt = np.full(n, -90.0)
-            az = np.zeros(n)
-            for i in night_idx:
-                alt[i], az[i] = horizontal(BODIES[key], atimes[i], observer)
-            track.alt = alt
-            track.az = az
+            track = _body_info(key, observer, midnight)
+            _fill_track(track, observer, unix, lst, location.latitude, PLANET_HORIZON)
             ephem.planets[key] = track
     return ephem
 
@@ -418,9 +455,7 @@ def snapshot(location: Location, moment: datetime) -> Snapshot:
     time = to_astro(moment)
     sun = horizontal(astronomy.Body.Sun, time, observer)
     moon_equ = astronomy.Equator(astronomy.Body.Moon, time, observer, True, True)
-    moon = astronomy.Horizon(
-        time, observer, moon_equ.ra, moon_equ.dec, astronomy.Refraction.Normal
-    )
+    moon = astronomy.Horizon(time, observer, moon_equ.ra, moon_equ.dec, astronomy.Refraction.Normal)
     illum = astronomy.Illumination(astronomy.Body.Moon, time)
     bodies = {key: horizontal(BODIES[key], time, observer) for key in PLANETS}
     return Snapshot(

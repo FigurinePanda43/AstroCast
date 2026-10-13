@@ -50,9 +50,7 @@ def night_date_for(moment: datetime, longitude: float) -> date:
 
 def night_window(night: date, longitude: float) -> tuple[datetime, datetime]:
     """Return the UTC [noon, next noon) window of a night (local mean solar time)."""
-    start = datetime(night.year, night.month, night.day, 12, tzinfo=UTC) - solar_offset(
-        longitude
-    )
+    start = datetime(night.year, night.month, night.day, 12, tzinfo=UTC) - solar_offset(longitude)
     return start, start + timedelta(days=1)
 
 

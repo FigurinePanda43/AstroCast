@@ -26,9 +26,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up binary sensors."""
     coordinator = entry.runtime_data
-    async_add_entities(
-        [AstronomicalNightSensor(coordinator), GoodConditionsSensor(coordinator)]
-    )
+    async_add_entities([AstronomicalNightSensor(coordinator), GoodConditionsSensor(coordinator)])
 
 
 def _dark_intervals(forecast: Forecast) -> list[tuple[datetime, datetime]]:
@@ -101,13 +99,9 @@ class AstronomicalNightSensor(AstroCastEntity, BinarySensorEntity):
             self._unsub()
             self._unsub = None
         now = dt_util.utcnow()
-        moments = sorted(
-            m for interval in self._intervals() for m in interval if m > now
-        )
+        moments = sorted(m for interval in self._intervals() for m in interval if m > now)
         if moments:
-            self._unsub = async_track_point_in_utc_time(
-                self.hass, self._transition, moments[0]
-            )
+            self._unsub = async_track_point_in_utc_time(self.hass, self._transition, moments[0])
 
     @callback
     def _transition(self, _now: datetime) -> None:

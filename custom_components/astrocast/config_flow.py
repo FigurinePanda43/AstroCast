@@ -5,8 +5,6 @@ from __future__ import annotations
 import math
 from typing import Any
 
-import voluptuous as vol
-
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -29,6 +27,7 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
     TextSelector,
 )
+import voluptuous as vol
 
 from .const import (
     CONF_BORTLE,
@@ -136,7 +135,9 @@ async def _resolve_elevation(
         and hass.config.elevation
     ):
         return float(hass.config.elevation)
-    found = await fetch_elevation(async_get_clientsession(hass), latitude, longitude, http_headers())
+    found = await fetch_elevation(
+        async_get_clientsession(hass), latitude, longitude, http_headers()
+    )
     if found is not None:
         return round(found)
     return float(hass.config.elevation or 0)
@@ -298,12 +299,15 @@ class AstroCastOptionsFlow(OptionsFlow):
         favorites = list(options.get(CONF_FAVORITES, []))
         sqm = options.get(CONF_SQM)
         schema: dict[Any, Any] = _preferences_schema(options)
-        schema[
-            vol.Optional(CONF_SQM, description={"suggested_value": sqm} if sqm else None)
-        ] = NumberSelector(
-            NumberSelectorConfig(
-                min=16.0, max=22.5, step=0.05, mode=NumberSelectorMode.BOX,
-                unit_of_measurement="mag/arcsec²",
+        schema[vol.Optional(CONF_SQM, description={"suggested_value": sqm} if sqm else None)] = (
+            NumberSelector(
+                NumberSelectorConfig(
+                    min=16.0,
+                    max=22.5,
+                    step=0.05,
+                    mode=NumberSelectorMode.BOX,
+                    unit_of_measurement="mag/arcsec²",
+                )
             )
         )
         schema[vol.Optional(CONF_FAVORITES, default=favorites)] = SelectSelector(

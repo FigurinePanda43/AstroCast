@@ -156,9 +156,7 @@ async def fetch_ensemble(
             "forecast_days": "16" if model.startswith("gfs") else "15",
         }
         try:
-            payload = await fetch_json(
-                session, ENSEMBLE_URL, params, timeout=45.0, headers=headers
-            )
+            payload = await fetch_json(session, ENSEMBLE_URL, params, timeout=45.0, headers=headers)
             series = parse_ensemble(payload, fetched)
         except ProviderError as err:
             last_error = err

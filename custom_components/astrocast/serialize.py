@@ -18,8 +18,10 @@ from .engine.scoring import ProfileNight
 from .engine.timeutil import iso
 from .i18n import body_name, event_description, event_title, lang_of
 
-SAMPLE_NIGHTS = 3  # nights with full 15-minute curves
-CURVE_NIGHTS = 16  # nights with hourly curves
+SAMPLE_NIGHTS = 2  # nights with full 15-minute curves
+CURVE_NIGHTS = 7  # nights with hourly curves
+TONIGHT_OBJECTS = 20  # objects sent for tonight (with altitude curves for the first 12)
+LATER_OBJECTS = 8  # compact objects sent for the following nights
 
 
 def _round(value: Any, digits: int = 1) -> Any:
@@ -42,7 +44,9 @@ def _night_span(ephem: NightEphemeris, margin_samples: int = 4) -> tuple[int, in
     if idx.size == 0:
         mid = len(ephem.times) // 2
         return max(0, mid - 8), min(len(ephem.times), mid + 8)
-    return max(0, int(idx[0]) - margin_samples), min(len(ephem.times), int(idx[-1]) + 1 + margin_samples)
+    return max(0, int(idx[0]) - margin_samples), min(
+        len(ephem.times), int(idx[-1]) + 1 + margin_samples
+    )
 
 
 def profile_to_dict(profile: ProfileNight) -> dict[str, Any]:
@@ -113,37 +117,66 @@ def object_to_dict(
     if span is not None and obj.altitudes is not None:
         start, end = span
         data["alt"] = [round(float(a)) for a in obj.altitudes[start:end]]
+        if obj.azimuths is not None:
+            data["az"] = [round(float(a)) for a in obj.azimuths[start:end]]
         if obj.scores is not None:
             data["scores"] = [round(float(s)) for s in obj.scores[start:end]]
     return data
 
 
-def _samples(night: NightForecast, span: tuple[int, int], step: int) -> dict[str, Any]:
+def object_brief(
+    obj: ObjectNight, language: str, favorites: set[str] | frozenset[str] = frozenset()
+) -> dict[str, Any]:
+    """Compact object summary (later nights, lists)."""
+    return {
+        "id": obj.id,
+        "kind": obj.kind,
+        "type": obj.type,
+        "name": object_name(obj, language),
+        "mag": _round(obj.mag),
+        "max_alt": _round(obj.max_alt),
+        "best_time": iso(obj.best_time),
+        "best_score": obj.best_score,
+        "window_start": iso(obj.window_start),
+        "window_end": iso(obj.window_end),
+        "hours_visible": obj.hours_visible,
+        "interest": obj.interest,
+        "favorite": obj.id in favorites,
+    }
+
+
+def _samples(night: NightForecast, span: tuple[int, int], step: int, full: bool) -> dict[str, Any]:
     ephem = night.ephem
     start, end = span
     sl = slice(start, end, step)
     weather = night.weather
-    return {
+    data: dict[str, Any] = {
         "start": iso(ephem.times[start]),
         "step_minutes": STEP_MINUTES * step,
-        "sun_alt": _array(ephem.sun_alt[sl]),
-        "moon_alt": _array(ephem.moon_alt[sl]),
+        "sun_alt": _array(ephem.sun_alt[sl], 0),
+        "moon_alt": _array(ephem.moon_alt[sl], 0),
+        "moon_az": _array(ephem.moon_az[sl], 0),
         "deep_sky": _array(night.deep_sky.scores[sl], 0),
         "planetary": _array(night.planetary.scores[sl], 0),
-        "deep_sky_potential": _array(night.deep_sky.potential_scores[sl], 0),
         "cloud": _array(weather.get(w.CLOUD)[sl], 0),
-        "cloud_low": _array(weather.get(w.CLOUD_LOW)[sl], 0),
-        "cloud_mid": _array(weather.get(w.CLOUD_MID)[sl], 0),
-        "cloud_high": _array(weather.get(w.CLOUD_HIGH)[sl], 0),
-        "seeing": _array(weather.get(w.SEEING)[sl], 2),
-        "transparency": _array(weather.get(w.TRANSPARENCY)[sl], 2),
-        "humidity": _array(weather.get(w.HUMIDITY)[sl], 0),
-        "wind": _array(weather.get(w.WIND)[sl], 0),
-        "temperature": _array(weather.get(w.TEMPERATURE)[sl], 1),
-        "dew_point": _array(weather.get(w.DEW_POINT)[sl], 1),
         "clear_probability": _array(weather.clear_probability[sl], 0),
-        "tier": weather.tier[sl],
     }
+    if full:
+        data.update(
+            {
+                "deep_sky_potential": _array(night.deep_sky.potential_scores[sl], 0),
+                "cloud_low": _array(weather.get(w.CLOUD_LOW)[sl], 0),
+                "cloud_mid": _array(weather.get(w.CLOUD_MID)[sl], 0),
+                "cloud_high": _array(weather.get(w.CLOUD_HIGH)[sl], 0),
+                "seeing": _array(weather.get(w.SEEING)[sl], 2),
+                "transparency": _array(weather.get(w.TRANSPARENCY)[sl], 2),
+                "humidity": _array(weather.get(w.HUMIDITY)[sl], 0),
+                "wind": _array(weather.get(w.WIND)[sl], 0),
+                "temperature": _array(weather.get(w.TEMPERATURE)[sl], 1),
+                "dew_point": _array(weather.get(w.DEW_POINT)[sl], 1),
+            }
+        )
+    return data
 
 
 def night_to_dict(
@@ -178,18 +211,23 @@ def night_to_dict(
         "planetary": profile_to_dict(night.planetary),
         "summary": night.summary,
     }
-    if index < CURVE_NIGHTS and night.has_weather or index < SAMPLE_NIGHTS:
+    if (index < CURVE_NIGHTS and night.has_weather) or index < SAMPLE_NIGHTS:
         span = _night_span(ephem)
         step = 1 if index < SAMPLE_NIGHTS else 4
-        data["samples"] = _samples(night, span, step)
-        obj_span = span if index < SAMPLE_NIGHTS else None
-        if night.objects:
+        data["samples"] = _samples(night, span, step, full=index < SAMPLE_NIGHTS)
+        if index == 0:
             data["objects"] = [
-                object_to_dict(o, language, obj_span if i < 12 else None, favorites)
-                for i, o in enumerate(night.objects)
+                object_to_dict(o, language, span if i < 12 else None, favorites)
+                for i, o in enumerate(night.objects[:TONIGHT_OBJECTS])
             ]
-        if night.planets:
-            data["planets"] = [object_to_dict(p, language, obj_span, favorites) for p in night.planets]
+            data["planets"] = [object_to_dict(p, language, span, favorites) for p in night.planets]
+        else:
+            if night.objects:
+                data["objects"] = [
+                    object_brief(o, language, favorites) for o in night.objects[:LATER_OBJECTS]
+                ]
+            if night.planets:
+                data["planets"] = [object_brief(p, language, favorites) for p in night.planets]
     return data
 
 
@@ -304,7 +342,13 @@ def forecast_to_dict(
         "nights": [
             night_to_dict(n, language, i, fav_set) for i, n in enumerate(forecast.nights[:nights])
         ],
-        "events": [event_to_dict(e, language, site.name) for e in forecast.events],
+        "events": [
+            event_to_dict(e, language, site.name)
+            for e in forecast.events
+            if e.importance >= 2
+            or e.type in ("moon_phase", "season", "meteor_shower")
+            or (e.visible and e.type in ("conjunction", "occultation"))
+        ],
         "favorites": [favorite_to_dict(f, language, catalog) for f in forecast.favorites],
         "providers": providers,
     }

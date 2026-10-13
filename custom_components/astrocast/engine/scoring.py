@@ -57,7 +57,15 @@ DEFAULT_SEEING = 1.75  # arcsec, typical mid-latitude site
 DEFAULT_EXTINCTION = 0.25  # mag/airmass when no transparency forecast exists
 
 CLOUD_EXPONENT = {DEEP_SKY: 1.6, PLANETARY: 1.1}
-SEEING_TABLE = ((0.8, 1.0), (1.0, 0.93), (1.5, 0.78), (2.0, 0.6), (2.5, 0.43), (3.0, 0.3), (4.0, 0.15))
+SEEING_TABLE = (
+    (0.8, 1.0),
+    (1.0, 0.93),
+    (1.5, 0.78),
+    (2.0, 0.6),
+    (2.5, 0.43),
+    (3.0, 0.3),
+    (4.0, 0.15),
+)
 SEEING_EXPONENT = {DEEP_SKY: 0.35, PLANETARY: 1.0}
 WIND_TABLE = ((12.0, 1.0), (20.0, 0.9), (30.0, 0.7), (40.0, 0.45), (55.0, 0.22), (70.0, 0.1))
 WIND_EXPONENT = {DEEP_SKY: 1.0, PLANETARY: 0.8}
@@ -222,7 +230,9 @@ def sample_weather(timeline: w.Timeline | None, ephem: NightEphemeris) -> NightW
     return NightWeather(values, has, tiers, conf, clear, members, sources)
 
 
-def zenith_moon_brightening(ephem: NightEphemeris, sqm: float, extinction: np.ndarray) -> np.ndarray:
+def zenith_moon_brightening(
+    ephem: NightEphemeris, sqm: float, extinction: np.ndarray
+) -> np.ndarray:
     """Moonlight brightening (mag/arcsec²) at the zenith for every sample."""
     return moon_brightening_mag(
         sqm,
@@ -327,7 +337,9 @@ class ProfileNight:
         return rating(self.score)
 
 
-def _best_block(scores: np.ndarray, usable: np.ndarray, length: int) -> tuple[int, int, float] | None:
+def _best_block(
+    scores: np.ndarray, usable: np.ndarray, length: int
+) -> tuple[int, int, float] | None:
     """Best contiguous block of ``length`` samples within the usable mask."""
     idx = np.flatnonzero(usable)
     if idx.size == 0:

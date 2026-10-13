@@ -32,12 +32,15 @@ def altaz(
     dec = np.asarray(dec_rad)[:, None]
     sin_alt = np.sin(phi) * np.sin(dec) + np.cos(phi) * np.cos(dec) * np.cos(ha)
     alt = np.degrees(np.arcsin(np.clip(sin_alt, -1.0, 1.0)))
-    az = np.degrees(
-        np.arctan2(
-            -np.sin(ha) * np.cos(dec),
-            np.cos(phi) * np.sin(dec) - np.sin(phi) * np.cos(dec) * np.cos(ha),
+    az = (
+        np.degrees(
+            np.arctan2(
+                -np.sin(ha) * np.cos(dec),
+                np.cos(phi) * np.sin(dec) - np.sin(phi) * np.cos(dec) * np.cos(ha),
+            )
         )
-    ) % 360.0
+        % 360.0
+    )
     if refraction:
         alt = alt + refraction_deg(alt)
     return alt, az

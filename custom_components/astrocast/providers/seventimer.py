@@ -83,7 +83,7 @@ def parse(payload: dict[str, Any], fetched: datetime) -> w.WeatherSeries:
         fields[w.TEMPERATURE].append(
             float(temp) if isinstance(temp, (int, float)) and temp > -100 else None
         )
-        fields[w.PRECIP_TYPE].append(PRECIP_TYPES.get(str(row.get("prec_type")), None))
+        fields[w.PRECIP_TYPE].append(PRECIP_TYPES.get(str(row.get("prec_type"))))
     if not times:
         raise ProviderError("7Timer! returned no data")
     return w.WeatherSeries(

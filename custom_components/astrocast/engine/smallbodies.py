@@ -193,9 +193,7 @@ def position(
     )
 
 
-def magnitude(
-    elements: OrbitalElements, r: float, delta: float, phase_deg: float
-) -> float | None:
+def magnitude(elements: OrbitalElements, r: float, delta: float, phase_deg: float) -> float | None:
     """Apparent magnitude estimate."""
     if elements.h is None:
         return None
@@ -231,7 +229,14 @@ def parse_sbdb(payload: dict[str, Any], kind: str) -> list[OrbitalElements]:
         q = _float(item.get("q"))
         if q is None and (a := _float(item.get("a"))) is not None and e is not None:
             q = a * (1.0 - e)
-        values = [e, q, _float(item.get("i")), _float(item.get("om")), _float(item.get("w")), _float(item.get("tp"))]
+        values = [
+            e,
+            q,
+            _float(item.get("i")),
+            _float(item.get("om")),
+            _float(item.get("w")),
+            _float(item.get("tp")),
+        ]
         if any(v is None for v in values) or q is None or q <= 0:
             continue
         e, q, inc, node, peri, tp = values  # type: ignore[misc]

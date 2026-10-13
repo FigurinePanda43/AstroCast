@@ -42,9 +42,7 @@ def _fmt(value: float | None, digits: int = 0) -> str:
     return f"{value:.{digits}f}" if digits else f"{round(value)}"
 
 
-def observing_windows(
-    forecast: Forecast, language: str, threshold: int
-) -> list[CalendarEvent]:
+def observing_windows(forecast: Forecast, language: str, threshold: int) -> list[CalendarEvent]:
     """Calendar events for every forecast window above the threshold."""
     events: list[CalendarEvent] = []
     for night in forecast.nights:
@@ -75,7 +73,11 @@ def observing_windows(
             ]
             if profile.limiting:
                 lines.append(
-                    text(language, "desc_limiting", factor=text(language, f"factor_{profile.limiting}"))
+                    text(
+                        language,
+                        "desc_limiting",
+                        factor=text(language, f"factor_{profile.limiting}"),
+                    )
                 )
             events.append(
                 CalendarEvent(

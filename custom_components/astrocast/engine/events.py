@@ -4,17 +4,29 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 import math
 from typing import Any
 
 import astronomy
 import numpy as np
 
-from .ephemeris import BODIES, KM_PER_AU, RADIUS_KM, Location, horizontal
+from .ephemeris import (
+    ANCHOR_HOURS,
+    BODIES,
+    KM_PER_AU,
+    RADIUS_KM,
+    SIDEREAL_RATE,
+    Location,
+    altaz_series,
+    equatorial_track,
+    horizontal,
+    local_sidereal_deg,
+)
 from .meteors import SHOWERS, hourly_rate, limiting_magnitude, peak_time
+from .skyglow import moon_brightening_mag
 from .smallbodies import OrbitalElements, position
-from .timeutil import from_astro, to_astro, utc
+from .timeutil import J2000_UNIX, from_astro, to_astro, utc
 
 # Bright stars and clusters close to the ecliptic that the Moon can approach
 # or occult (J2000 coordinates: RA hours, Dec degrees, magnitude).
@@ -110,6 +122,25 @@ def _golden_minimum(
     return mid, func(mid)
 
 
+def _horizontal_series(
+    target: str, unix: np.ndarray, observer: astronomy.Observer, lst: np.ndarray, latitude: float
+) -> np.ndarray:
+    """Apparent altitude of a body or ecliptic star over a time grid."""
+    if target in ECLIPTIC_STARS:
+        ra_h, dec, _ = ECLIPTIC_STARS[target]
+        time = astronomy.Time((float(unix[len(unix) // 2]) - J2000_UNIX) / 86400.0)
+        vec = astronomy.Vector(*_star_unit(ra_h, dec), time)
+        sph = astronomy.EquatorFromVector(
+            astronomy.RotateVector(astronomy.Rotation_EQJ_EQD(time), vec)
+        )
+        ra = np.full(len(unix), sph.ra * 15.0)
+        decs = np.full(len(unix), sph.dec)
+    else:
+        anchor = ANCHOR_HOURS.get(target, 6.0)
+        ra, decs, _ = equatorial_track(BODIES[target], observer, unix, anchor)
+    return altaz_series(ra, decs, lst, latitude)[1]
+
+
 def best_viewing(
     targets: Iterable[str],
     center: datetime,
@@ -123,17 +154,24 @@ def best_viewing(
     Returns (best time, lowest altitude among targets at that time).
     """
     targets = tuple(targets)
-    best: tuple[datetime | None, float] = (None, -90.0)
     steps = int(span_hours * 3)
-    for k in range(-steps, steps + 1):
-        moment = center + timedelta(minutes=20 * k)
-        time = to_astro(moment)
-        if horizontal(astronomy.Body.Sun, time, observer)[0] > sun_limit:
-            continue
-        low = min(target_horizontal(t, time, observer)[0] for t in targets)
-        if low >= min_alt and low > best[1]:
-            best = (moment, low)
-    return best
+    unix = np.array(
+        [(center + timedelta(minutes=20 * k)).timestamp() for k in range(-steps, steps + 1)]
+    )
+    lst = (
+        local_sidereal_deg(astronomy.Time((unix[0] - J2000_UNIX) / 86400.0), observer.longitude)
+        + SIDEREAL_RATE * (unix - unix[0]) / 86400.0
+    ) % 360.0
+    sun = _horizontal_series("sun", unix, observer, lst, observer.latitude)
+    lowest = np.min(
+        np.vstack([_horizontal_series(t, unix, observer, lst, observer.latitude) for t in targets]),
+        axis=0,
+    )
+    valid = (sun <= sun_limit) & (lowest >= min_alt)
+    if not np.any(valid):
+        return None, -90.0
+    idx = int(np.argmax(np.where(valid, lowest, -999.0)))
+    return datetime.fromtimestamp(float(unix[idx]), tz=UTC), float(lowest[idx])
 
 
 # --- event finders -------------------------------------------------------------
@@ -179,9 +217,7 @@ def lunar_eclipses(
         begin = peak - timedelta(minutes=info.sd_penum)
         finish = peak + timedelta(minutes=info.sd_penum)
         samples = [begin + (finish - begin) * f for f in (0.0, 0.25, 0.5, 0.75, 1.0)]
-        moon_alts = [
-            horizontal(astronomy.Body.Moon, to_astro(s), observer)[0] for s in samples
-        ]
+        moon_alts = [horizontal(astronomy.Body.Moon, to_astro(s), observer)[0] for s in samples]
         visible = max(moon_alts) > 0.0
         peak_alt = horizontal(astronomy.Body.Moon, info.peak, observer)[0]
         data: dict[str, Any] = {
@@ -260,9 +296,7 @@ def solar_eclipses(
     return events
 
 
-def oppositions(
-    start: datetime, end: datetime, observer: astronomy.Observer
-) -> list[AstroEvent]:
+def oppositions(start: datetime, end: datetime, observer: astronomy.Observer) -> list[AstroEvent]:
     """Oppositions of the superior planets.
 
     astronomy-engine measures the heliocentric longitude of the planet relative
@@ -296,9 +330,7 @@ def oppositions(
     return events
 
 
-def elongations(
-    start: datetime, end: datetime, observer: astronomy.Observer
-) -> list[AstroEvent]:
+def elongations(start: datetime, end: datetime, observer: astronomy.Observer) -> list[AstroEvent]:
     """Greatest elongations of Mercury and Venus (best inner-planet views)."""
     events: list[AstroEvent] = []
     for key in ("mercury", "venus"):
@@ -312,7 +344,9 @@ def elongations(
             if moment > end:
                 break
             side = "evening" if found.visibility == astronomy.Visibility.Evening else "morning"
-            best_time, best_alt = best_viewing((key,), moment, observer, span_hours=14, sun_limit=-6)
+            best_time, best_alt = best_viewing(
+                (key,), moment, observer, span_hours=14, sun_limit=-6
+            )
             illum = astronomy.Illumination(body, found.time)
             events.append(
                 AstroEvent(
@@ -374,36 +408,46 @@ def meteor_showers(
             peak = peak_time(shower, year)
             if peak is None or not (start - timedelta(days=1) <= peak <= end):
                 continue
-            best: tuple[float, datetime | None, float, float] = (0.0, None, 0.0, 0.0)
-            # Scan the 36 hours centred on the peak for the best dark hour.
-            for k in range(-36, 37):
-                moment = peak + timedelta(minutes=30 * k)
-                time = to_astro(moment)
-                if horizontal(astronomy.Body.Sun, time, observer)[0] > -12.0:
-                    continue
-                vec = astronomy.Vector(*_star_unit(shower.radiant_ra / 15.0, shower.radiant_dec), time)
-                sph = astronomy.EquatorFromVector(
-                    astronomy.RotateVector(astronomy.Rotation_EQJ_EQD(time), vec)
+            # Scan the 36 hours centred on the peak (30-minute steps) for the
+            # dark hour with the highest expected rate.
+            offsets = np.arange(-36, 37)
+            unix = peak.timestamp() + offsets * 1800.0
+            lst = (
+                local_sidereal_deg(
+                    astronomy.Time((unix[0] - J2000_UNIX) / 86400.0), observer.longitude
                 )
-                rad_alt = astronomy.Horizon(
-                    time, observer, sph.ra, sph.dec, astronomy.Refraction.Normal
-                ).altitude
-                moon_alt = horizontal(astronomy.Body.Moon, time, observer)[0]
-                sky = sqm
-                if moon_alt > 0:
-                    illum = astronomy.Illumination(astronomy.Body.Moon, time)
-                    # Moonlight brightens the whole sky; use the zenith value.
-                    from .skyglow import moon_brightening_mag  # noqa: PLC0415
-
-                    sky = sqm - float(
-                        moon_brightening_mag(sqm, illum.phase_angle, 90.0 - moon_alt, moon_alt, 90.0)
-                    )
-                lm = limiting_magnitude(sky)
-                rate = hourly_rate(shower, rad_alt, lm)
+                + SIDEREAL_RATE * (unix - unix[0]) / 86400.0
+            ) % 360.0
+            sun = _horizontal_series("sun", unix, observer, lst, location.latitude)
+            moon = _horizontal_series("moon", unix, observer, lst, location.latitude)
+            mid = astronomy.Time((peak.timestamp() - J2000_UNIX) / 86400.0)
+            vec = astronomy.Vector(*_star_unit(shower.radiant_ra / 15.0, shower.radiant_dec), mid)
+            sph = astronomy.EquatorFromVector(
+                astronomy.RotateVector(astronomy.Rotation_EQJ_EQD(mid), vec)
+            )
+            radiant = altaz_series(
+                np.full(len(unix), sph.ra * 15.0),
+                np.full(len(unix), sph.dec),
+                lst,
+                location.latitude,
+            )[1]
+            illum = astronomy.Illumination(astronomy.Body.Moon, mid)
+            brightening = moon_brightening_mag(sqm, illum.phase_angle, 90.0 - moon, moon, 90.0)
+            sky = sqm - np.where(moon > 0, brightening, 0.0)
+            best: tuple[float, datetime | None, float, float] = (0.0, None, 0.0, 0.0)
+            for k in range(len(unix)):
+                if sun[k] > -12.0:
+                    continue
+                rate = hourly_rate(shower, float(radiant[k]), limiting_magnitude(float(sky[k])))
                 # Prefer times close to the peak (activity profile ~1 day wide).
-                weight = rate * math.exp(-((k / 2.0) / 24.0) ** 2)
+                weight = rate * math.exp(-(((offsets[k] / 2.0) / 24.0) ** 2))
                 if weight > best[0]:
-                    best = (weight, moment, rate, rad_alt)
+                    best = (
+                        weight,
+                        datetime.fromtimestamp(float(unix[k]), tz=UTC),
+                        rate,
+                        float(radiant[k]),
+                    )
             illum_frac = astronomy.Illumination(astronomy.Body.Moon, to_astro(peak)).phase_fraction
             if shower.zhr >= 50:
                 importance = 3 if best[2] >= 10 else 2
@@ -435,6 +479,38 @@ def meteor_showers(
     return events
 
 
+class _VectorCache:
+    """Geocentric unit vectors sampled on a regular grid, linearly interpolated."""
+
+    def __init__(self, start: datetime, end: datetime, step_hours: float) -> None:
+        self.t0 = start.timestamp()
+        self.step = step_hours * 3600.0
+        self.count = int((end.timestamp() - self.t0) / self.step) + 2
+        self._grid: dict[str, np.ndarray] = {}
+
+    def grid(self, target: str) -> np.ndarray:
+        """Vectors on the grid, shape (count, 3)."""
+        if target not in self._grid:
+            self._grid[target] = np.array(
+                [
+                    geocentric_unit(
+                        target, astronomy.Time((self.t0 + i * self.step - J2000_UNIX) / 86400.0)
+                    )
+                    for i in range(self.count)
+                ]
+            )
+        return self._grid[target]
+
+    def at(self, target: str, unix: np.ndarray) -> np.ndarray:
+        """Interpolated unit vectors at timestamps, shape (len(unix), 3)."""
+        grid = self.grid(target)
+        pos = np.clip((unix - self.t0) / self.step, 0, self.count - 1.000001)
+        i0 = np.floor(pos).astype(int)
+        frac = (pos - i0)[:, None]
+        vec = grid[i0] * (1 - frac) + grid[np.minimum(i0 + 1, self.count - 1)] * frac
+        return vec / np.linalg.norm(vec, axis=1)[:, None]
+
+
 def _pair_minima(
     first: str,
     seconds: Iterable[str],
@@ -442,19 +518,30 @@ def _pair_minima(
     end: datetime,
     step_hours: float,
     threshold: float,
+    cache: _VectorCache,
 ) -> list[tuple[str, datetime, float]]:
-    """Times of minimum geocentric separation below ``threshold`` (deg)."""
+    """Times of minimum geocentric separation below ``threshold`` (deg).
+
+    Slow movers come from a daily cache; the Moon is sampled directly every
+    ``step_hours``. Candidates are refined with the exact ephemeris.
+    """
     seconds = tuple(seconds)
     n = int((end - start).total_seconds() / 3600.0 / step_hours) + 1
-    times = [to_astro(start + timedelta(hours=step_hours * i)) for i in range(n)]
-    first_u = [geocentric_unit(first, t) for t in times]
+    unix = np.array([start.timestamp() + i * step_hours * 3600.0 for i in range(n)])
+    if first == "moon":
+        first_u = np.array(
+            [geocentric_unit("moon", astronomy.Time((ts - J2000_UNIX) / 86400.0)) for ts in unix]
+        )
+    else:
+        first_u = cache.at(first, unix)
     found: list[tuple[str, datetime, float]] = []
     for other in seconds:
-        seps = np.array([_separation(first_u[i], geocentric_unit(other, t)) for i, t in enumerate(times)])
+        other_u = cache.at(other, unix)
+        seps = np.degrees(np.arccos(np.clip(np.sum(first_u * other_u, axis=1), -1.0, 1.0)))
         for i in range(1, n - 1):
             if seps[i] <= seps[i - 1] and seps[i] < seps[i + 1] and seps[i] < threshold + 2.0:
-                t0 = times[i].ut - step_hours / 24.0
-                t1 = times[i].ut + step_hours / 24.0
+                t0 = (unix[i] - J2000_UNIX) / 86400.0 - step_hours / 24.0
+                t1 = (unix[i] - J2000_UNIX) / 86400.0 + step_hours / 24.0
 
                 def func(ut: float, other: str = other) -> float:
                     time = astronomy.Time(ut)
@@ -494,7 +581,9 @@ def _occultation(
     hi = grid[min(len(grid) - 1, idx + 1)]
     ut, sep = _golden_minimum(topo_sep, lo, hi, tol=1.0 / 8640.0)
     time = astronomy.Time(ut)
-    moon_dist_km = astronomy.Equator(astronomy.Body.Moon, time, observer, False, True).dist * KM_PER_AU
+    moon_dist_km = (
+        astronomy.Equator(astronomy.Body.Moon, time, observer, False, True).dist * KM_PER_AU
+    )
     moon_radius = math.degrees(math.asin(RADIUS_KM["moon"] / moon_dist_km))
     target_radius = 0.0
     if target in RADIUS_KM:
@@ -510,8 +599,12 @@ def conjunctions(
 ) -> list[AstroEvent]:
     """Close approaches: Moon–planet, Moon–bright star/cluster, planet–planet."""
     events: list[AstroEvent] = []
+    cache = _VectorCache(start, max(end_moon, end_planets), 24.0)
     moon_targets = (*BRIGHT_PLANETS, "uranus", "neptune", *ECLIPTIC_STARS)
-    for target, moment, sep in _pair_minima("moon", moon_targets, start, end_moon, 3.0, 4.0):
+    for target, closest, sep in _pair_minima(
+        "moon", moon_targets, start, end_moon, 3.0, 4.0, cache
+    ):
+        moment = closest
         visible_time, alt = best_viewing(("moon", target), moment, observer, span_hours=12)
         data: dict[str, Any] = {
             "bodies": ["moon", target],
@@ -536,9 +629,9 @@ def conjunctions(
         if event_type == "conjunction":
             if target in ("uranus", "neptune", "beehive") and sep > 1.0:
                 continue
-            if sep < 1.0 and visible_time:
-                importance = 2
-            elif sep < 2.5 and visible_time and target in ("venus", "jupiter", "pleiades"):
+            if (sep < 1.0 and visible_time) or (
+                sep < 2.5 and visible_time and target in ("venus", "jupiter", "pleiades")
+            ):
                 importance = 2
         events.append(
             AstroEvent(
@@ -555,11 +648,15 @@ def conjunctions(
     planets = (*BRIGHT_PLANETS, "uranus", "neptune")
     for i, first in enumerate(planets):
         others = planets[i + 1 :]
-        for target, moment, sep in _pair_minima(first, others, start, end_planets, 24.0, 3.0):
+        for target, moment, sep in _pair_minima(
+            first, others, start, end_planets, 24.0, 3.0, cache
+        ):
             if (first in ("uranus", "neptune") or target in ("uranus", "neptune")) and sep > 1.0:
                 continue
             sun_sep = min(
-                _separation(geocentric_unit(b, to_astro(moment)), geocentric_unit("sun", to_astro(moment)))
+                _separation(
+                    geocentric_unit(b, to_astro(moment)), geocentric_unit("sun", to_astro(moment))
+                )
                 for b in (first, target)
             )
             if sun_sep < 12.0:
