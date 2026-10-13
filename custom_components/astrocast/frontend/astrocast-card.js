@@ -986,7 +986,9 @@ class AstroCastView extends HTMLElement {
       };
       const meta = [];
       if (ds.window_start) meta.push(`${esc(this.t("window"))} ${this.fmtTime(ds.window_start)}–${this.fmtTime(ds.window_end)}`);
-      if (n.summary.cloud_cover !== null && n.summary.cloud_cover !== undefined && n.has_weather) meta.push(`☁ ${Math.round(n.summary.cloud_cover)} %`);
+      // Deterministic cloud amounts are not meaningful at trend range: show the
+      // ensemble clear-sky probability instead.
+      if (n.summary.cloud_cover !== null && n.summary.cloud_cover !== undefined && n.has_weather && ds.tier !== "trend") meta.push(`☁ ${Math.round(n.summary.cloud_cover)} %`);
       if (n.summary.clear_probability !== null && n.summary.clear_probability !== undefined && n.has_weather && ds.tier === "trend") meta.push(`${esc(this.t("clear_chance"))} ${Math.round(n.summary.clear_probability)} %`);
       meta.push(`${n.moonless_dark_hours.toFixed(1)} ${esc(this.t("hours_short"))} ${esc(this.t("moonless_hours"))}`);
       const tier = n.has_weather ? ds.tier : "astro";
