@@ -7,6 +7,7 @@ from typing import Any
 from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 import voluptuous as vol
 
@@ -15,7 +16,7 @@ from .coordinator import AstroCastCoordinator, signal_update
 from .engine.ephemeris import PLANETS
 from .i18n import body_name, lang_of
 from .serialize import forecast_to_dict
-from .services import async_set_favorite, object_visibility
+from .services import async_set_favorite, object_visibility, resolve_object
 
 
 @callback
@@ -246,5 +247,12 @@ async def ws_favorite(
     coordinator = _coordinator(hass, connection, msg)
     if coordinator is None:
         return
-    favorites = await async_set_favorite(hass, coordinator, msg["object_id"], msg["favorite"])
+    object_id = msg["object_id"]
+    if msg["favorite"]:
+        try:
+            object_id = resolve_object(coordinator, object_id)
+        except ServiceValidationError:
+            connection.send_error(msg["id"], "unknown_object", f"Unknown object: {object_id}")
+            return
+    favorites = await async_set_favorite(hass, coordinator, object_id, msg["favorite"])
     connection.send_result(msg["id"], {CONF_FAVORITES: favorites})

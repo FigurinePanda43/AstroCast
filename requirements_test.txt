@@ -1,4 +1,4 @@
 pytest-homeassistant-custom-component==0.13.372
 astronomy-engine==2.1.19
-ruff==0.14.10
+ruff==0.16.9
 home-assistant-frontend==20260930.3

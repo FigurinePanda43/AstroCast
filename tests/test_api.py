@@ -125,6 +125,12 @@ async def test_websocket_api(hass: HomeAssistant, setup_integration, hass_ws_cli
     msg = await client.receive_json()
     assert not msg["success"]
 
+    await client.send_json(
+        {"id": 7, "type": "astrocast/favorite", "object_id": "Planet X", "favorite": True}
+    )
+    msg = await client.receive_json()
+    assert msg["error"]["code"] == "unknown_object"
+
 
 async def test_websocket_subscription(
     hass: HomeAssistant, setup_integration, hass_ws_client
