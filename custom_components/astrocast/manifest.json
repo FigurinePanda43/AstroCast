@@ -1,0 +1,14 @@
+{
+  "domain": "astrocast",
+  "name": "AstroCast",
+  "codeowners": ["@FigurinePanda43"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http", "panel_custom", "websocket_api"],
+  "documentation": "https://github.com/FigurinePanda43/AstroCast",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/FigurinePanda43/AstroCast/issues",
+  "loggers": ["astrocast", "astronomy"],
+  "requirements": ["astronomy-engine==2.1.19", "numpy>=1.26.0"],
+  "version": "0.1.0"
+}
