@@ -104,7 +104,8 @@ For each object and sample:
 object score = 100 × sky factors × altitude factor × moon factor at the object
 ```
 
-* **Altitude factor:** 0 below your minimum altitude; above it, the extinction loss
+* **Altitude factor:** 0 below your minimum altitude or below the local horizon profile at the
+  object's azimuth (linear interpolation between your `azimuth:altitude` points); above it, the extinction loss
   10^(−0.2 (k + 0.1)(X − 1)) with the Kasten & Young airmass X. For planets and the Moon the
   seeing is degraded with altitude (FWHM ∝ X^0.6).
 * **Moon sensitivity** depends on the object type (1 for galaxies and nebulae, 0.45 for open
@@ -143,4 +144,5 @@ covered by the weather forecast whose best score reaches your threshold.
 * Weather forecasts — especially cloud cover more than a few days ahead — are uncertain; the
   tiers and confidence are there to remind it.
 * 7Timer! seeing is itself a model output (from GFS); the jet-stream proxy is coarse.
-* No horizon mask by azimuth, no light-pollution map, no satellite pass predictions yet.
+* No light-pollution map and no satellite pass predictions yet; the horizon profile is a
+  simple polyline.
