@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 import json
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 from homeassistant.const import CONF_ELEVATION, CONF_LATITUDE, CONF_LONGITUDE
 from homeassistant.core import HomeAssistant
@@ -41,6 +42,13 @@ def load_fixture(name: str) -> Any:
 def auto_enable_custom_integrations(enable_custom_integrations: None) -> Generator[None]:
     """Enable custom integrations in every test."""
     return
+
+
+@pytest.fixture(autouse=True)
+def no_retry_delay() -> Generator[None]:
+    """Do not wait between HTTP retries in tests."""
+    with patch("custom_components.astrocast.providers.base.RETRY_DELAY", 0):
+        yield
 
 
 @pytest.fixture

@@ -13,6 +13,7 @@ import aiohttp
 _LOGGER = logging.getLogger(__name__)
 
 USER_AGENT = "AstroCast/{version} (+https://github.com/FigurinePanda43/AstroCast)"
+RETRY_DELAY = 2.0  # seconds before retrying a transient error
 
 
 class ProviderError(Exception):
@@ -103,7 +104,7 @@ async def fetch_json(
         except (TimeoutError, aiohttp.ClientError, ValueError) as err:
             last_error = err
             if attempt < retries:
-                await asyncio.sleep(2.0 * (attempt + 1))
+                await asyncio.sleep(RETRY_DELAY * (attempt + 1))
     raise ProviderError(f"{type(last_error).__name__}: {last_error}") from last_error
 
 
