@@ -1,0 +1,258 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Ajouter un site d'observation",
+        "description": "Choisissez votre site d'observation sur la carte (déplacez le marqueur). Par défaut, c'est l'emplacement de Home Assistant. Laissez l'altitude vide pour la déterminer automatiquement à partir d'un modèle numérique de terrain.",
+        "data": {
+          "name": "Nom du site",
+          "location": "Emplacement",
+          "elevation": "Altitude"
+        },
+        "data_description": {
+          "name": "Par exemple « Jardin » ou « Site en montagne ».",
+          "elevation": "Mètres au-dessus du niveau de la mer. Utilisée pour la transparence et la réfraction."
+        }
+      },
+      "observing": {
+        "title": "Comment observez-vous ?",
+        "description": "Ces réglages affinent les recommandations. Altitude du site : {elevation} m. Tout reste modifiable ensuite.",
+        "data": {
+          "bortle": "Qualité du ciel (échelle de Bortle)",
+          "equipment": "Instrument principal",
+          "min_altitude": "Hauteur minimale utilisable",
+          "threshold": "Seuil de « bonnes conditions »"
+        },
+        "data_description": {
+          "bortle": "Pollution lumineuse du site. En cas de doute, consultez lightpollutionmap.info.",
+          "equipment": "Sert à juger quels objets sont assez lumineux pour valoir le détour.",
+          "min_altitude": "Les objets plus bas (arbres, bâtiments, brume) sont ignorés.",
+          "threshold": "Score (0-100) au-delà duquel les fenêtres sont ajoutées au calendrier et le capteur « bonnes conditions » s'active."
+        }
+      },
+      "reconfigure": {
+        "title": "Déplacer ou renommer le site",
+        "description": "Déplacez le marqueur pour changer d'emplacement. Laissez l'altitude vide pour la recalculer.",
+        "data": {
+          "name": "Nom du site",
+          "location": "Emplacement",
+          "elevation": "Altitude"
+        }
+      }
+    },
+    "error": {
+      "invalid_location": "Coordonnées invalides."
+    },
+    "abort": {
+      "already_configured": "Ce site est déjà configuré.",
+      "reconfigure_successful": "Le site a été mis à jour."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options d'AstroCast",
+        "data": {
+          "bortle": "Qualité du ciel (échelle de Bortle)",
+          "sqm": "Brillance du ciel mesurée (SQM, facultatif)",
+          "equipment": "Instrument principal",
+          "min_altitude": "Hauteur minimale utilisable",
+          "threshold": "Seuil de « bonnes conditions »",
+          "favorites": "Objets favoris",
+          "show_panel": "Afficher AstroCast dans la barre latérale"
+        },
+        "data_description": {
+          "sqm": "Si vous possédez un Sky Quality Meter, sa mesure au zénith remplace la classe de Bortle.",
+          "favorites": "Chaque favori dispose d'un capteur indiquant sa prochaine fenêtre d'observation favorable.",
+          "show_panel": "Ajoute un tableau de bord AstroCast dans la barre latérale (commun à tous les sites)."
+        }
+      }
+    }
+  },
+  "selector": {
+    "bortle": {
+      "options": {
+        "1": "1 – Site d'exception (SQM ≈ 21,9)",
+        "2": "2 – Site vraiment noir (≈ 21,7)",
+        "3": "3 – Ciel rural (≈ 21,4)",
+        "4": "4 – Transition rural/périurbain (≈ 20,9)",
+        "5": "5 – Ciel périurbain (≈ 19,9)",
+        "6": "6 – Périurbain lumineux (≈ 19,1)",
+        "7": "7 – Transition périurbain/urbain (≈ 18,4)",
+        "8": "8 – Ciel de ville (≈ 17,8)",
+        "9": "9 – Centre-ville (≈ 17,2)"
+      }
+    },
+    "equipment": {
+      "options": {
+        "naked_eye": "Œil nu",
+        "binoculars": "Jumelles",
+        "small_telescope": "Petit instrument (jusqu'à 100 mm)",
+        "medium_telescope": "Instrument moyen (100 à 200 mm)",
+        "large_telescope": "Grand instrument (plus de 200 mm)",
+        "astrophotography": "Astrophotographie (caméra)"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "deep_sky_tonight": {
+        "name": "Ciel profond ce soir"
+      },
+      "planetary_tonight": {
+        "name": "Planétaire ce soir"
+      },
+      "deep_sky_now": {
+        "name": "Ciel profond maintenant"
+      },
+      "planetary_now": {
+        "name": "Planétaire maintenant"
+      },
+      "best_night": {
+        "name": "Meilleure nuit à venir"
+      },
+      "cloud_cover": {
+        "name": "Couverture nuageuse"
+      },
+      "seeing": {
+        "name": "Seeing (turbulence)"
+      },
+      "transparency": {
+        "name": "Transparence (extinction)"
+      },
+      "moon_phase": {
+        "name": "Phase de la Lune",
+        "state": {
+          "new_moon": "Nouvelle Lune",
+          "waxing_crescent": "Premier croissant",
+          "first_quarter": "Premier quartier",
+          "waxing_gibbous": "Gibbeuse croissante",
+          "full_moon": "Pleine Lune",
+          "waning_gibbous": "Gibbeuse décroissante",
+          "last_quarter": "Dernier quartier",
+          "waning_crescent": "Dernier croissant"
+        }
+      },
+      "moon_illumination": {
+        "name": "Illumination de la Lune"
+      },
+      "moonrise": {
+        "name": "Prochain lever de Lune"
+      },
+      "moonset": {
+        "name": "Prochain coucher de Lune"
+      },
+      "astronomical_dusk": {
+        "name": "Crépuscule astronomique"
+      },
+      "astronomical_dawn": {
+        "name": "Aube astronomique"
+      },
+      "next_event": {
+        "name": "Prochain événement astronomique"
+      },
+      "top_object": {
+        "name": "Meilleure cible ce soir"
+      },
+      "visible_planets": {
+        "name": "Planètes visibles ce soir"
+      },
+      "data_sources": {
+        "name": "Sources de données",
+        "state": {
+          "ok": "OK",
+          "degraded": "Dégradées",
+          "unavailable": "Indisponibles"
+        }
+      },
+      "favorite": {
+        "name": "{object} prochaine fenêtre"
+      }
+    },
+    "binary_sensor": {
+      "astronomical_night": {
+        "name": "Nuit astronomique"
+      },
+      "good_conditions": {
+        "name": "Bonnes conditions d'observation"
+      }
+    },
+    "calendar": {
+      "observing_windows": {
+        "name": "Fenêtres d'observation"
+      },
+      "astronomy_events": {
+        "name": "Événements astronomiques"
+      }
+    }
+  },
+  "services": {
+    "get_forecast": {
+      "name": "Obtenir les prévisions",
+      "description": "Renvoie les prévisions d'observation d'un site pour les prochaines nuits.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Site",
+          "description": "Le site d'observation AstroCast."
+        },
+        "days": {
+          "name": "Nuits",
+          "description": "Nombre de nuits à renvoyer (1 à 16)."
+        }
+      }
+    },
+    "get_object_visibility": {
+      "name": "Visibilité d'un objet",
+      "description": "Indique quand un objet (planète, objet Messier/NGC, comète…) sera le mieux placé au cours des prochaines nuits.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Site",
+          "description": "Le site d'observation AstroCast."
+        },
+        "object": {
+          "name": "Objet",
+          "description": "Nom ou désignation, par ex. Jupiter, M31, NGC 7000, Nébuleuse d'Orion."
+        }
+      }
+    },
+    "add_favorite": {
+      "name": "Ajouter un favori",
+      "description": "Ajoute un objet aux favoris d'un site.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Site",
+          "description": "Le site d'observation AstroCast."
+        },
+        "object": {
+          "name": "Objet",
+          "description": "Nom ou désignation, par ex. Saturne ou M42."
+        }
+      }
+    },
+    "remove_favorite": {
+      "name": "Retirer un favori",
+      "description": "Retire un objet des favoris d'un site.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Site",
+          "description": "Le site d'observation AstroCast."
+        },
+        "object": {
+          "name": "Objet",
+          "description": "Nom ou désignation."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "unknown_entry": {
+      "message": "Aucun site AstroCast avec l'identifiant {entry_id}."
+    },
+    "entry_not_loaded": {
+      "message": "Ce site AstroCast n'est pas chargé."
+    },
+    "unknown_object": {
+      "message": "Objet inconnu : {object}."
+    }
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "entity": {
+    "sensor": {
+      "deep_sky_tonight": {
+        "default": "mdi:telescope"
+      },
+      "planetary_tonight": {
+        "default": "mdi:orbit"
+      },
+      "deep_sky_now": {
+        "default": "mdi:star-four-points"
+      },
+      "planetary_now": {
+        "default": "mdi:earth"
+      },
+      "best_night": {
+        "default": "mdi:calendar-star"
+      },
+      "cloud_cover": {
+        "default": "mdi:weather-cloudy"
+      },
+      "seeing": {
+        "default": "mdi:blur"
+      },
+      "transparency": {
+        "default": "mdi:eye-outline"
+      },
+      "moon_phase": {
+        "default": "mdi:moon-waxing-crescent",
+        "state": {
+          "new_moon": "mdi:moon-new",
+          "waxing_crescent": "mdi:moon-waxing-crescent",
+          "first_quarter": "mdi:moon-first-quarter",
+          "waxing_gibbous": "mdi:moon-waxing-gibbous",
+          "full_moon": "mdi:moon-full",
+          "waning_gibbous": "mdi:moon-waning-gibbous",
+          "last_quarter": "mdi:moon-last-quarter",
+          "waning_crescent": "mdi:moon-waning-crescent"
+        }
+      },
+      "moon_illumination": {
+        "default": "mdi:brightness-6"
+      },
+      "moonrise": {
+        "default": "mdi:arrow-up-thin"
+      },
+      "moonset": {
+        "default": "mdi:arrow-down-thin"
+      },
+      "astronomical_dusk": {
+        "default": "mdi:weather-night"
+      },
+      "astronomical_dawn": {
+        "default": "mdi:weather-sunset-up"
+      },
+      "next_event": {
+        "default": "mdi:calendar-clock"
+      },
+      "top_object": {
+        "default": "mdi:star-shooting"
+      },
+      "visible_planets": {
+        "default": "mdi:saturn"
+      },
+      "data_sources": {
+        "default": "mdi:database-check",
+        "state": {
+          "degraded": "mdi:database-alert",
+          "unavailable": "mdi:database-off"
+        }
+      },
+      "favorite": {
+        "default": "mdi:star"
+      }
+    },
+    "binary_sensor": {
+      "astronomical_night": {
+        "default": "mdi:weather-night",
+        "state": {
+          "off": "mdi:weather-sunny"
+        }
+      },
+      "good_conditions": {
+        "default": "mdi:telescope",
+        "state": {
+          "off": "mdi:cloud-outline"
+        }
+      }
+    },
+    "calendar": {
+      "observing_windows": {
+        "default": "mdi:calendar-star"
+      },
+      "astronomy_events": {
+        "default": "mdi:calendar-month"
+      }
+    }
+  },
+  "services": {
+    "get_forecast": {
+      "service": "mdi:telescope"
+    },
+    "get_object_visibility": {
+      "service": "mdi:star-search"
+    },
+    "add_favorite": {
+      "service": "mdi:star-plus"
+    },
+    "remove_favorite": {
+      "service": "mdi:star-minus"
+    }
+  }
+}

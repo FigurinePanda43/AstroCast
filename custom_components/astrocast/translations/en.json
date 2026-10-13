@@ -1,0 +1,258 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add an observing site",
+        "description": "Pick your observing site on the map (drag the marker). It defaults to your Home Assistant location. Leave the elevation empty to look it up automatically from a digital elevation model.",
+        "data": {
+          "name": "Site name",
+          "location": "Location",
+          "elevation": "Elevation"
+        },
+        "data_description": {
+          "name": "For example \"Garden\" or \"Mountain site\".",
+          "elevation": "Metres above sea level. Used for transparency and refraction."
+        }
+      },
+      "observing": {
+        "title": "How do you observe?",
+        "description": "These settings tune the recommendations. Site elevation: {elevation} m. Everything can be changed later.",
+        "data": {
+          "bortle": "Sky darkness (Bortle scale)",
+          "equipment": "Main equipment",
+          "min_altitude": "Lowest usable altitude",
+          "threshold": "\"Good conditions\" threshold"
+        },
+        "data_description": {
+          "bortle": "Light pollution at the site. Use lightpollutionmap.info if unsure.",
+          "equipment": "Used to judge which objects are bright enough to be worth it.",
+          "min_altitude": "Objects lower than this (trees, buildings, haze) are ignored.",
+          "threshold": "Score (0-100) above which windows are added to the calendar and the 'good conditions' sensor turns on."
+        }
+      },
+      "reconfigure": {
+        "title": "Move or rename the site",
+        "description": "Drag the marker to move the site. Leave the elevation empty to look it up again.",
+        "data": {
+          "name": "Site name",
+          "location": "Location",
+          "elevation": "Elevation"
+        }
+      }
+    },
+    "error": {
+      "invalid_location": "Invalid coordinates."
+    },
+    "abort": {
+      "already_configured": "This site is already configured.",
+      "reconfigure_successful": "The site has been updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "AstroCast options",
+        "data": {
+          "bortle": "Sky darkness (Bortle scale)",
+          "sqm": "Measured sky brightness (SQM, optional)",
+          "equipment": "Main equipment",
+          "min_altitude": "Lowest usable altitude",
+          "threshold": "\"Good conditions\" threshold",
+          "favorites": "Favourite objects",
+          "show_panel": "Show AstroCast in the sidebar"
+        },
+        "data_description": {
+          "sqm": "If you own a Sky Quality Meter, its zenith reading overrides the Bortle class.",
+          "favorites": "Each favourite gets a sensor with its next favourable observing window.",
+          "show_panel": "Adds an AstroCast dashboard to the sidebar (shared by all sites)."
+        }
+      }
+    }
+  },
+  "selector": {
+    "bortle": {
+      "options": {
+        "1": "1 – Excellent dark site (SQM ≈ 21.9)",
+        "2": "2 – Typical truly dark site (≈ 21.7)",
+        "3": "3 – Rural sky (≈ 21.4)",
+        "4": "4 – Rural/suburban transition (≈ 20.9)",
+        "5": "5 – Suburban sky (≈ 19.9)",
+        "6": "6 – Bright suburban sky (≈ 19.1)",
+        "7": "7 – Suburban/urban transition (≈ 18.4)",
+        "8": "8 – City sky (≈ 17.8)",
+        "9": "9 – Inner-city sky (≈ 17.2)"
+      }
+    },
+    "equipment": {
+      "options": {
+        "naked_eye": "Naked eye",
+        "binoculars": "Binoculars",
+        "small_telescope": "Small telescope (up to 100 mm)",
+        "medium_telescope": "Medium telescope (100–200 mm)",
+        "large_telescope": "Large telescope (over 200 mm)",
+        "astrophotography": "Astrophotography (camera)"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "deep_sky_tonight": {
+        "name": "Deep sky tonight"
+      },
+      "planetary_tonight": {
+        "name": "Planetary tonight"
+      },
+      "deep_sky_now": {
+        "name": "Deep sky now"
+      },
+      "planetary_now": {
+        "name": "Planetary now"
+      },
+      "best_night": {
+        "name": "Best upcoming night"
+      },
+      "cloud_cover": {
+        "name": "Cloud cover"
+      },
+      "seeing": {
+        "name": "Seeing"
+      },
+      "transparency": {
+        "name": "Transparency (extinction)"
+      },
+      "moon_phase": {
+        "name": "Moon phase",
+        "state": {
+          "new_moon": "New moon",
+          "waxing_crescent": "Waxing crescent",
+          "first_quarter": "First quarter",
+          "waxing_gibbous": "Waxing gibbous",
+          "full_moon": "Full moon",
+          "waning_gibbous": "Waning gibbous",
+          "last_quarter": "Last quarter",
+          "waning_crescent": "Waning crescent"
+        }
+      },
+      "moon_illumination": {
+        "name": "Moon illumination"
+      },
+      "moonrise": {
+        "name": "Next moonrise"
+      },
+      "moonset": {
+        "name": "Next moonset"
+      },
+      "astronomical_dusk": {
+        "name": "Astronomical dusk"
+      },
+      "astronomical_dawn": {
+        "name": "Astronomical dawn"
+      },
+      "next_event": {
+        "name": "Next astronomical event"
+      },
+      "top_object": {
+        "name": "Best target tonight"
+      },
+      "visible_planets": {
+        "name": "Planets visible tonight"
+      },
+      "data_sources": {
+        "name": "Data sources",
+        "state": {
+          "ok": "OK",
+          "degraded": "Degraded",
+          "unavailable": "Unavailable"
+        }
+      },
+      "favorite": {
+        "name": "{object} next window"
+      }
+    },
+    "binary_sensor": {
+      "astronomical_night": {
+        "name": "Astronomical night"
+      },
+      "good_conditions": {
+        "name": "Good observing conditions"
+      }
+    },
+    "calendar": {
+      "observing_windows": {
+        "name": "Observing windows"
+      },
+      "astronomy_events": {
+        "name": "Astronomical events"
+      }
+    }
+  },
+  "services": {
+    "get_forecast": {
+      "name": "Get forecast",
+      "description": "Returns the observing forecast of a site for the coming nights.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Site",
+          "description": "The AstroCast observing site."
+        },
+        "days": {
+          "name": "Nights",
+          "description": "Number of nights to return (1-16)."
+        }
+      }
+    },
+    "get_object_visibility": {
+      "name": "Get object visibility",
+      "description": "Returns when an object (planet, Messier/NGC object, comet...) is best placed over the coming nights.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Site",
+          "description": "The AstroCast observing site."
+        },
+        "object": {
+          "name": "Object",
+          "description": "Name or designation, e.g. Jupiter, M31, NGC 7000, Orion Nebula."
+        }
+      }
+    },
+    "add_favorite": {
+      "name": "Add favourite",
+      "description": "Adds an object to the favourites of a site.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Site",
+          "description": "The AstroCast observing site."
+        },
+        "object": {
+          "name": "Object",
+          "description": "Name or designation, e.g. Saturn or M42."
+        }
+      }
+    },
+    "remove_favorite": {
+      "name": "Remove favourite",
+      "description": "Removes an object from the favourites of a site.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Site",
+          "description": "The AstroCast observing site."
+        },
+        "object": {
+          "name": "Object",
+          "description": "Name or designation."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "unknown_entry": {
+      "message": "No AstroCast site with id {entry_id}."
+    },
+    "entry_not_loaded": {
+      "message": "This AstroCast site is not loaded."
+    },
+    "unknown_object": {
+      "message": "Unknown object: {object}."
+    }
+  }
+}
