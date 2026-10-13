@@ -91,13 +91,16 @@ Python pur, et `numpy`, déjà fourni avec Home Assistant) s'installent automati
 1. **Site** — donnez-lui un nom et déplacez le marqueur sur la carte (par défaut, votre
    domicile). Laissez l'altitude vide pour l'obtenir depuis le modèle numérique de terrain
    Copernicus.
+
+   <img src="docs/images/config-flow.png" width="420" alt="Ajout d'un site d'observation sur la carte">
 2. **Votre pratique** — qualité du ciel (échelle de Bortle), instrument principal, hauteur
    minimale utilisable (arbres, bâtiments…) et score à partir duquel les conditions sont jugées
    *bonnes*.
 
 Ajoutez à nouveau l'intégration pour chaque site supplémentaire. **Reconfigurer** permet de
 déplacer ou renommer un site, **Configurer** (options) de changer les préférences, saisir une
-mesure SQM, choisir des objets favoris ou masquer le panneau latéral.
+mesure SQM, décrire votre horizon local (obstacles sous forme de couples `azimut:hauteur`, par
+ex. `0:15, 90:30, 180:10, 270:25`), choisir des objets favoris ou masquer le panneau latéral.
 
 ## Tableau de bord
 
@@ -174,7 +177,8 @@ services météo ci-dessus. Les diagnostics les arrondissent à ~10 km.
 - La pollution lumineuse provient de votre réglage Bortle (ou SQM) ; pas de carte automatique.
 - Le catalogue se concentre sur les ~600 objets du ciel profond les plus intéressants ; les
   étoiles doubles et variables ne sont pas encore couvertes.
-- Pas encore de masque d'horizon par azimut (seulement une hauteur minimale).
+- Le profil d'horizon est une simple ligne brisée de points `azimut:hauteur` (pas encore
+  d'import de panorama ou de fichier d'horizon).
 
 ## Licences et remerciements
 

@@ -38,7 +38,7 @@ exposes useful entities, calendars and actions for automations — plus a dedica
 | --- | --- | --- |
 | ![Tonight](docs/images/card-tonight.png) | ![Nights](docs/images/card-nights.png) | ![Objects](docs/images/card-objects.png) |
 
-![Sidebar panel](docs/images/panel.png)
+![Sidebar panel in Home Assistant](docs/images/panel-real.png)
 
 > **Status: beta (0.x).** The core features are implemented and tested, but the scoring
 > curves will keep being tuned with real-world feedback. Please report your experience!
@@ -98,12 +98,16 @@ Python, and `numpy`, already shipped with Home Assistant) are installed automati
 
 1. **Site** — name it and drag the marker on the map (defaults to your home). Leave the
    elevation empty to get it from the Copernicus digital elevation model.
+
+   <img src="docs/images/config-flow.png" width="420" alt="Adding an observing site on the map">
+
 2. **How you observe** — sky darkness (Bortle scale), main equipment, lowest usable altitude
    (trees, buildings…) and the score above which conditions are considered *good*.
 
 Add the integration again for each additional site. Use **Reconfigure** to move or rename a
-site and **Configure** (options) to change preferences, set a measured SQM value, pick
-favourite objects, or hide the sidebar panel.
+site and **Configure** (options) to change preferences, set a measured SQM value, describe
+your local horizon (obstacles as `azimuth:altitude` pairs, e.g. `0:15, 90:30, 180:10, 270:25`),
+pick favourite objects, or hide the sidebar panel.
 
 ## Dashboard
 
@@ -206,8 +210,8 @@ services above, nothing else. Diagnostics round them to ~10 km.
   light-pollution map.
 - The catalog focuses on the ~600 most rewarding deep-sky objects; double stars and
   variable stars are not covered yet.
-- Local horizon masks (azimuth-dependent obstacles) are not supported yet; only a minimum
-  altitude.
+- The horizon profile is a simple polyline of `azimuth:altitude` points (no import of
+  panoramas or horizon files yet).
 
 ## Development
 

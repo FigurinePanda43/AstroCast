@@ -23,3 +23,4 @@ First public beta.
 - Sensors, binary sensors, calendars, actions with responses, websocket API, diagnostics,
   English and French translations.
 - Lovelace card and sidebar panel registered automatically.
+- Local horizon profile (obstacles by azimuth) used for object visibility and drawn on the sky map.
