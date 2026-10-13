@@ -59,14 +59,19 @@
           "min_altitude": "Lowest usable altitude",
           "threshold": "\"Good conditions\" threshold",
           "favorites": "Favourite objects",
-          "show_panel": "Show AstroCast in the sidebar"
+          "show_panel": "Show AstroCast in the sidebar",
+          "horizon": "Horizon profile (optional)"
         },
         "data_description": {
           "sqm": "If you own a Sky Quality Meter, its zenith reading overrides the Bortle class.",
           "favorites": "Each favourite gets a sensor with its next favourable observing window.",
-          "show_panel": "Adds an AstroCast dashboard to the sidebar (shared by all sites)."
+          "show_panel": "Adds an AstroCast dashboard to the sidebar (shared by all sites).",
+          "horizon": "Obstacles as azimuth:altitude pairs in degrees, e.g. \"0:15, 90:30, 180:10, 270:25\" (north = 0, east = 90). Objects behind them are ignored."
         }
       }
+    },
+    "error": {
+      "invalid_horizon": "Invalid horizon profile: use azimuth:altitude pairs such as \"0:15, 90:30, 180:10\"."
     }
   },
   "selector": {

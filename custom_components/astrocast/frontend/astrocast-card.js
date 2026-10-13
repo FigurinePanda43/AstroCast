@@ -1190,6 +1190,27 @@ class AstroCastView extends HTMLElement {
     parts.push(`<circle cx="${C}" cy="${C}" r="${R}" fill="rgba(15,15,55,.55)" stroke="currentColor" stroke-opacity=".3"/>`);
     for (const alt of [30, 60]) parts.push(`<circle cx="${C}" cy="${C}" r="${((90 - alt) / 90) * R}" fill="none" stroke="#fff" stroke-opacity=".15"/>`);
     const minAlt = this._data.site.min_altitude || 0;
+    const horizon = this._data.site.horizon || [];
+    if (horizon.length) {
+      // Obstructed sky (horizon profile), interpolated every 5° of azimuth.
+      const pts = [];
+      const altAt = (az) => {
+        const sorted = [...horizon].sort((a, b) => a[0] - b[0]);
+        if (sorted.length === 1) return sorted[0][1];
+        for (let i = 0; i < sorted.length; i++) {
+          const [a0, h0] = sorted[i];
+          const [a1raw, h1] = sorted[(i + 1) % sorted.length];
+          const a1 = i + 1 < sorted.length ? a1raw : a1raw + 360;
+          const a = az < sorted[0][0] ? az + 360 : az;
+          if (a >= a0 && a <= a1) return h0 + ((h1 - h0) * (a - a0)) / (a1 - a0 || 1);
+        }
+        return sorted[0][1];
+      };
+      for (let az = 0; az <= 360; az += 5) pts.push(proj(Math.max(0, altAt(az % 360)), az));
+      const outer = [];
+      for (let az = 360; az >= 0; az -= 5) outer.push(proj(0, az));
+      parts.push(`<path d="M${pts.map((p) => p.map((v) => v.toFixed(1)).join(",")).join(" L")} L${outer.map((p) => p.map((v) => v.toFixed(1)).join(",")).join(" L")} Z" fill="#000" fill-opacity=".45" stroke="#f2b630" stroke-opacity=".6"><title>${esc(this.t("horizon_limit"))}</title></path>`);
+    }
     if (minAlt > 0) parts.push(`<circle cx="${C}" cy="${C}" r="${((90 - minAlt) / 90) * R}" fill="none" stroke="#f2b630" stroke-opacity=".5" stroke-dasharray="4 4"><title>${esc(this.t("horizon_limit"))}</title></circle>`);
     for (const [label, az] of [[this.t("north"), 0], [this.t("east"), 90], [this.t("south"), 180], [this.t("west"), 270]]) {
       const [x, y] = proj(-8, az);

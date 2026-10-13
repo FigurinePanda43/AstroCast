@@ -336,6 +336,7 @@ def forecast_to_dict(
             "min_altitude": site.min_altitude,
             "equipment": site.equipment,
             "threshold": site.threshold,
+            "horizon": [list(point) for point in site.horizon],
         },
         "now": now_to_dict(forecast),
         "best_night": best.ephem.night.isoformat() if best else None,

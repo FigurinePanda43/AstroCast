@@ -12,6 +12,7 @@ from custom_components.astrocast.const import (
     CONF_BORTLE,
     CONF_EQUIPMENT,
     CONF_FAVORITES,
+    CONF_HORIZON,
     CONF_LOCATION,
     CONF_MIN_ALTITUDE,
     CONF_SHOW_PANEL,
@@ -143,3 +144,22 @@ async def test_options_flow(hass: HomeAssistant, setup_integration) -> None:
     assert entry.options[CONF_FAVORITES] == ["M42", "saturn"]
     assert entry.runtime_data.site.sky_brightness == 21.2
     assert entry.runtime_data.site.equipment == "astrophotography"
+
+
+async def test_options_flow_horizon(hass: HomeAssistant, setup_integration) -> None:
+    entry = setup_integration
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {**PREFERENCES, CONF_HORIZON: "north is blocked", CONF_SHOW_PANEL: True},
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_HORIZON: "invalid_horizon"}
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {**PREFERENCES, CONF_HORIZON: "0=20; 180=5,5", CONF_SHOW_PANEL: True},
+    )
+    await hass.async_block_till_done()
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_HORIZON] == "0:20, 180:5.5"
+    assert entry.runtime_data.site.horizon == ((0.0, 20.0), (180.0, 5.5))

@@ -10,6 +10,12 @@ import pytest
 from custom_components.astrocast.engine import scoring, weather as w
 from custom_components.astrocast.engine.catalog import load_catalog
 from custom_components.astrocast.engine.ephemeris import Location, compute_night
+from custom_components.astrocast.engine.horizon import (
+    HorizonError,
+    altitude_limit,
+    format_horizon,
+    parse_horizon,
+)
 from custom_components.astrocast.engine.planner import Planner, SiteConfig
 from custom_components.astrocast.engine.smallbodies import parse_sbdb
 from custom_components.astrocast.providers import metno, open_meteo, seventimer
@@ -331,3 +337,38 @@ def test_planner_now(forecast) -> None:
     assert now.scores["deep_sky"] is not None
     assert now.tier == "detailed"
     assert now.moonset is not None and now.moonrise is not None
+
+
+# --- horizon profile -------------------------------------------------------------
+
+
+def test_parse_horizon() -> None:
+    points = parse_horizon("0:15, 90:30, 180:10, 270:25")
+    assert points == ((0.0, 15.0), (90.0, 30.0), (180.0, 10.0), (270.0, 25.0))
+    assert format_horizon(points) == "0:15, 90:30, 180:10, 270:25"
+    assert parse_horizon("45=12,5; 200/8") == ((45.0, 12.5), (200.0, 8.0))
+    assert parse_horizon("") == ()
+    for bad in ("abc", "0:95", "10"):
+        with pytest.raises(HorizonError):
+            parse_horizon(bad)
+    limits = altitude_limit(points, np.array([0.0, 45.0, 135.0, 315.0]), 20.0)
+    np.testing.assert_allclose(limits, [20.0, 22.5, 20.0, 20.0])
+
+
+def test_horizon_hides_objects() -> None:
+    timeline = w.build_timeline(_series(), NOW, 100)
+    catalog = load_catalog()
+    open_sky = Planner(SiteConfig("Open", LATITUDE, LONGITUDE, 100), catalog).compute(NOW, timeline)
+    walled = Planner(
+        SiteConfig(
+            "Walled", LATITUDE, LONGITUDE, 100, horizon=parse_horizon("0:75, 90:75, 180:75, 270:75")
+        ),
+        catalog,
+    ).compute(NOW, timeline)
+    assert any(o.max_alt < 75 for o in open_sky.tonight.objects)
+    assert walled.tonight.objects
+    assert all(o.max_alt >= 75 for o in walled.tonight.objects)
+    saturn = {p.id: p for p in walled.tonight.planets}["saturn"]
+    assert saturn.best_score == 0
+    # The sky itself is unchanged: only object visibility depends on the horizon.
+    assert walled.tonight.deep_sky.score == open_sky.tonight.deep_sky.score
