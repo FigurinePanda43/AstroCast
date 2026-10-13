@@ -21,6 +21,7 @@ from .ephemeris import (
     Snapshot,
     compute_night,
     moon_phase_name,
+    next_rise_set,
     snapshot,
 )
 from .events import AstroEvent, compute_events
@@ -106,6 +107,8 @@ class NowConditions:
     confidence: float | None
     clear_probability: float | None
     dew_risk: str | None
+    moonrise: datetime | None = None
+    moonset: datetime | None = None
 
     @property
     def moon_phase_name(self) -> str:
@@ -418,7 +421,10 @@ class Planner:
             factors_out[profile] = {k: round(float(v[0]), 3) for k, v in factors.items()}
             limiting[profile] = scoring.limiting_factor(factors, np.array([True]))
 
+        moonrise, moonset = next_rise_set(self.site.location, "moon", now)
         return NowConditions(
+            moonrise=moonrise,
+            moonset=moonset,
             time=now,
             snapshot=snap,
             is_dark=snap.sun_alt < ASTRONOMICAL,

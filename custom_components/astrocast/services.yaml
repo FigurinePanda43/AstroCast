@@ -1,0 +1,53 @@
+get_forecast:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: astrocast
+    days:
+      default: 7
+      selector:
+        number:
+          min: 1
+          max: 16
+          mode: box
+
+get_object_visibility:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: astrocast
+    object:
+      required: true
+      example: "M31"
+      selector:
+        text:
+
+add_favorite:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: astrocast
+    object:
+      required: true
+      example: "Saturn"
+      selector:
+        text:
+
+remove_favorite:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: astrocast
+    object:
+      required: true
+      example: "Saturn"
+      selector:
+        text:
