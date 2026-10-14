@@ -53,6 +53,13 @@ jobs:
             echo "::error::Tag $GITHUB_REF_NAME does not match the manifest version $manifest"
             exit 1
           fi
+          if [ "$EVENT" = "workflow_run" ] \
+            && [ "$(git ls-remote origin refs/heads/main | cut -f1)" != "$SHA" ]; then
+            # Only the head of main is released: a newer push has its own test run.
+            echo "::notice::$SHA is no longer the head of main, nothing to publish"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if gh release view "$tag" > /dev/null 2>&1; then
             echo "::notice::Release $tag already exists, nothing to publish"
             echo "publish=false" >> "$GITHUB_OUTPUT"
