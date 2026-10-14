@@ -1,19 +1,20 @@
 name: Repository settings
 
 # Applies .github/repository.json (description, homepage, topics) to the GitHub
-# repository whenever that file changes on main, or when run manually.
+# repository whenever that file or this workflow changes on main, or when run
+# manually.
 #
 # Changing these settings needs the "Administration: write" permission, which
 # the built-in GITHUB_TOKEN cannot have. Create a fine-grained personal access
 # token restricted to this repository with Repository permissions →
 # Administration: "Read and write", and store it as the Actions secret
-# REPO_SETTINGS_TOKEN (Settings → Secrets and variables → Actions). Without the
-# secret the workflow only prints a warning.
+# REPO_SETTINGS_TOKEN (Settings → Secrets and variables → Actions → Secrets →
+# Repository secrets). The workflow fails when the secret is missing.
 
 on:
   push:
     branches: [main]
-    paths: [".github/repository.json"]
+    paths: [".github/repository.json", ".github/workflows/repository-settings.yml"]
   workflow_dispatch:
 
 permissions:
@@ -33,8 +34,8 @@ jobs:
           SETTINGS: .github/repository.json
         run: |
           if [ -z "$GH_TOKEN" ]; then
-            echo "::warning::The REPO_SETTINGS_TOKEN secret is not set: repository settings were not applied"
-            exit 0
+            echo "::error::The REPO_SETTINGS_TOKEN repository secret is missing or not visible to Actions"
+            exit 1
           fi
           jq -e 'type == "object"' "$SETTINGS" > /dev/null
           jq '{description, homepage} | with_entries(select(.value != null))' "$SETTINGS" \
