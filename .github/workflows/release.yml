@@ -3,14 +3,18 @@ name: Release
 # Publishing a version:
 #   1. set "version" in custom_components/astrocast/manifest.json,
 #   2. add a "## [x.y.z] – date" section to CHANGELOG.md,
-#   3. either push the tag (git tag vx.y.z && git push origin vx.y.z) or run
-#      this workflow manually on main (Actions → Release → Run workflow), which
-#      creates the vx.y.z tag from the manifest version.
-# The workflow checks that the tag matches the manifest and publishes the
-# GitHub release with the changelog section as notes. 0.x versions and
-# versions with a pre-release suffix (b1, rc1…) are marked as pre-releases.
+#   3. push to main.
+# When the Tests workflow succeeds on main and the manifest version has no
+# GitHub release yet, this workflow tags the tested commit vx.y.z and
+# publishes the release with the changelog section as notes. It can also be
+# run manually on main (Actions → Release → Run workflow) or by pushing a
+# vx.y.z tag. 0.x versions and versions with a pre-release suffix (b1, rc1…)
+# are marked as pre-releases.
 
 on:
+  workflow_run:
+    workflows: [Tests]
+    types: [completed]
   push:
     tags: ["v*"]
   workflow_dispatch:
@@ -21,10 +25,22 @@ permissions:
 jobs:
   release:
     name: Publish release
-    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
 
       - name: Check the version and extract the release notes
         id: notes
@@ -32,46 +48,48 @@ jobs:
           EVENT: ${{ github.event_name }}
         run: |
           manifest="$(jq -r .version custom_components/astrocast/manifest.json)"
-          if [ "$EVENT" = "push" ]; then
-            tag="$GITHUB_REF_NAME"
-            if [ "${tag#v}" != "$manifest" ]; then
-              echo "::error::Tag $tag does not match the manifest version $manifest"
-              exit 1
-            fi
-          else
-            tag="v$manifest"
-            if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
-              echo "::error::Tag $tag already exists: bump the manifest version first"
-              exit 1
-            fi
+          tag="v$manifest"
+          if [ "$EVENT" = "push" ] && [ "$GITHUB_REF_NAME" != "$tag" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match the manifest version $manifest"
+            exit 1
           fi
-          version="${tag#v}"
-          awk -v v="$version" '
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "::notice::Release $tag already exists, nothing to publish"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          awk -v v="$manifest" '
             /^## \[/ { if (found) exit; if (index($0, "[" v "]")) { found = 1; next } }
             found { print }
           ' CHANGELOG.md > release-notes.md
           if ! grep -q '[^[:space:]]' release-notes.md; then
-            echo "::error::CHANGELOG.md has no section for $version"
+            echo "::error::CHANGELOG.md has no section for $manifest"
             exit 1
           fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          case "$version" in
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "existing_tag=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "existing_tag=false" >> "$GITHUB_OUTPUT"
+          fi
+          case "$manifest" in
             0.* | *a* | *b* | *rc* | *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
             *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
           esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
 
       - name: Create the GitHub release
+        if: steps.notes.outputs.publish == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
-          EVENT: ${{ github.event_name }}
           TAG: ${{ steps.notes.outputs.tag }}
+          EXISTING_TAG: ${{ steps.notes.outputs.existing_tag }}
           PRERELEASE: ${{ steps.notes.outputs.prerelease }}
         run: |
-          if [ "$EVENT" = "push" ]; then
+          if [ "$EXISTING_TAG" = "true" ]; then
             target=(--verify-tag)
           else
-            # The release creates the tag on the commit this run checked out.
-            target=(--target "$GITHUB_SHA")
+            # The release creates the tag on the tested commit.
+            target=(--target "$SHA")
           fi
           gh release create "$TAG" "${target[@]}" \
             --title "AstroCast $TAG" \
