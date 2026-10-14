@@ -26,7 +26,3 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # Repository topics are a GitHub setting (Settings → General → Topics).
-          # Remove this line once topics such as "home-assistant", "hacs" and
-          # "astronomy" have been added to the repository.
-          ignore: topics
