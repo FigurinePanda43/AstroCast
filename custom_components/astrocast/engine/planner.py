@@ -215,23 +215,41 @@ class Planner:
         self._nights: dict[date, NightEphemeris] = {}
         self._events: tuple[date, list[AstroEvent]] | None = None
 
+    def _night(self, night: date, with_planets: bool) -> NightEphemeris:
+        cached = self._nights.get(night)
+        # A night cached beyond the planet window must be recomputed once it
+        # enters the window (it would otherwise lack planet tracks).
+        if cached is None or (with_planets and not cached.planets):
+            cached = compute_night(self.site.location, night, with_planets=with_planets)
+            self._nights[night] = cached
+        return cached
+
+    def current_night(self, now: datetime) -> date:
+        """Date of the night presented as "tonight".
+
+        A night runs from local mean solar noon to the next one, but it is over
+        once the Sun has risen: from sunrise on, "tonight" is the coming night
+        (otherwise the whole morning would describe the night that just ended).
+        Without a sunrise (polar day or night) the noon boundary is kept.
+        """
+        night = night_date_for(now, self.site.longitude)
+        sunrise = self._night(night, with_planets=True).sunrise
+        if sunrise is not None and utc(now) >= sunrise:
+            return night + timedelta(days=1)
+        return night
+
     def nights_for(self, now: datetime, count: int = TOTAL_NIGHTS) -> list[NightEphemeris]:
-        """Ephemerides of the next ``count`` nights (cached)."""
-        first = night_date_for(now, self.site.longitude)
-        wanted = [first + timedelta(days=i) for i in range(count)]
+        """Ephemerides of the next ``count`` nights, from tonight (cached)."""
+        first = self.current_night(now)
+        # Keep the night containing ``now`` until noon: current_night needs it.
+        oldest = night_date_for(now, self.site.longitude)
         for night in list(self._nights):
-            if night < first:
+            if night < oldest:
                 del self._nights[night]
-        location = self.site.location
-        for i, night in enumerate(wanted):
-            cached = self._nights.get(night)
-            # A night cached beyond the planet window must be recomputed once it
-            # enters the window (it would otherwise lack planet tracks).
-            if cached is None or (i < WEATHER_NIGHTS and not cached.planets):
-                self._nights[night] = compute_night(
-                    location, night, with_planets=i < WEATHER_NIGHTS
-                )
-        return [self._nights[n] for n in wanted]
+        return [
+            self._night(first + timedelta(days=i), with_planets=i < WEATHER_NIGHTS)
+            for i in range(count)
+        ]
 
     def events(self, now: datetime, comets: Sequence[OrbitalElements]) -> list[AstroEvent]:
         """Events (recomputed once per day)."""

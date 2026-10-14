@@ -8,6 +8,9 @@ understood and challenged. Source code references are given in `code` style.
 * A **night** runs from local mean solar noon to the next noon (`engine/timeutil.py`). This
   definition works everywhere, including polar regions, and does not depend on political time
   zones. Each night is sampled every 15 minutes, aligned on whole quarter hours.
+* **Tonight** is the night containing the current moment until sunrise, then the coming night
+  (`Planner.current_night`): in the morning, sensors and the card already describe the next
+  evening. Without a sunrise (polar day or night) the change happens at local mean solar noon.
 * Positions of the Sun, Moon and planets come from **astronomy-engine** (VSOP87 / ELP-based,
   ±1′ against JPL DE ephemerides), topocentric, with aberration and nutation. To stay fast
   on small ARM boards, exact positions are computed every 4 h (Sun), 1 h (Moon) or 12 h
