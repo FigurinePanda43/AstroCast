@@ -3,14 +3,17 @@ name: Release
 # Publishing a version:
 #   1. set "version" in custom_components/astrocast/manifest.json,
 #   2. add a "## [x.y.z] – date" section to CHANGELOG.md,
-#   3. push the tag: git tag vx.y.z && git push origin vx.y.z
-# This workflow checks that the tag matches the manifest and publishes the
+#   3. either push the tag (git tag vx.y.z && git push origin vx.y.z) or run
+#      this workflow manually on main (Actions → Release → Run workflow), which
+#      creates the vx.y.z tag from the manifest version.
+# The workflow checks that the tag matches the manifest and publishes the
 # GitHub release with the changelog section as notes. 0.x versions and
 # versions with a pre-release suffix (b1, rc1…) are marked as pre-releases.
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -18,19 +21,31 @@ permissions:
 jobs:
   release:
     name: Publish release
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Check the version and extract the release notes
         id: notes
+        env:
+          EVENT: ${{ github.event_name }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
           manifest="$(jq -r .version custom_components/astrocast/manifest.json)"
-          if [ "$version" != "$manifest" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match the manifest version $manifest"
-            exit 1
+          if [ "$EVENT" = "push" ]; then
+            tag="$GITHUB_REF_NAME"
+            if [ "${tag#v}" != "$manifest" ]; then
+              echo "::error::Tag $tag does not match the manifest version $manifest"
+              exit 1
+            fi
+          else
+            tag="v$manifest"
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+              echo "::error::Tag $tag already exists: bump the manifest version first"
+              exit 1
+            fi
           fi
+          version="${tag#v}"
           awk -v v="$version" '
             /^## \[/ { if (found) exit; if (index($0, "[" v "]")) { found = 1; next } }
             found { print }
@@ -39,6 +54,7 @@ jobs:
             echo "::error::CHANGELOG.md has no section for $version"
             exit 1
           fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
           case "$version" in
             0.* | *a* | *b* | *rc* | *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
             *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
@@ -47,10 +63,17 @@ jobs:
       - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ steps.notes.outputs.tag }}
           PRERELEASE: ${{ steps.notes.outputs.prerelease }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            --title "AstroCast $GITHUB_REF_NAME" \
+          if [ "$EVENT" = "push" ]; then
+            target=(--verify-tag)
+          else
+            # The release creates the tag on the commit this run checked out.
+            target=(--target "$GITHUB_SHA")
+          fi
+          gh release create "$TAG" "${target[@]}" \
+            --title "AstroCast $TAG" \
             --notes-file release-notes.md \
-            --verify-tag \
             --prerelease="$PRERELEASE"
