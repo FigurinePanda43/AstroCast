@@ -1,0 +1,47 @@
+name: Repository settings
+
+# Applies .github/repository.json (description, homepage, topics) to the GitHub
+# repository whenever that file changes on main, or when run manually.
+#
+# Changing these settings needs the "Administration: write" permission, which
+# the built-in GITHUB_TOKEN cannot have. Create a fine-grained personal access
+# token restricted to this repository with Repository permissions →
+# Administration: "Read and write", and store it as the Actions secret
+# REPO_SETTINGS_TOKEN (Settings → Secrets and variables → Actions). Without the
+# secret the workflow only prints a warning.
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/repository.json"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    name: Apply repository settings
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply description, homepage and topics
+        env:
+          GH_TOKEN: ${{ secrets.REPO_SETTINGS_TOKEN }}
+          SETTINGS: .github/repository.json
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::The REPO_SETTINGS_TOKEN secret is not set: repository settings were not applied"
+            exit 0
+          fi
+          jq -e 'type == "object"' "$SETTINGS" > /dev/null
+          jq '{description, homepage} | with_entries(select(.value != null))' "$SETTINGS" \
+            | gh api --method PATCH "repos/$GITHUB_REPOSITORY" --input - \
+              --jq '"Description: \(.description)"'
+          if jq -e 'has("topics")' "$SETTINGS" > /dev/null; then
+            jq '{names: .topics}' "$SETTINGS" \
+              | gh api --method PUT "repos/$GITHUB_REPOSITORY/topics" --input - \
+                --jq '"Topics: \(.names | join(", "))"'
+          fi
