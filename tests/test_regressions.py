@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, date, datetime, timedelta
+import json
 import math
+from pathlib import Path
 
 import pytest
 
@@ -17,7 +19,7 @@ from custom_components.astrocast.engine.smallbodies import (
     OrbitalElements,
     heliocentric_ecliptic,
 )
-from custom_components.astrocast.engine.timeutil import night_window
+from custom_components.astrocast.engine.timeutil import night_date_for, night_window
 
 from .conftest import LATITUDE, LONGITUDE, NOW
 from .test_engine_forecast import _series
@@ -38,7 +40,8 @@ def test_tonight_keeps_its_score_after_midnight() -> None:
     """Past samples of the current night must not make it look uncovered."""
     series = _series()
     planner = Planner(SiteConfig("Test", LATITUDE, LONGITUDE, 100), load_catalog())
-    for hour in (20, 23, 26, 28, 30):
+    # Up to 05:00 UTC on the 14th: sunrise is at 05:53 UTC.
+    for hour in (20, 23, 26, 28, 29):
         moment = datetime(2026, 10, 13, tzinfo=UTC) + timedelta(hours=hour)
         night_start = night_window(date(2026, 10, 13), LONGITUDE)[0]
         timeline = w.build_timeline(series, moment, 100, start=night_start)
@@ -46,6 +49,42 @@ def test_tonight_keeps_its_score_after_midnight() -> None:
         assert forecast.tonight.ephem.night == date(2026, 10, 13)
         assert forecast.tonight.has_weather, hour
         assert forecast.tonight.deep_sky.score is not None, hour
+
+
+def test_tonight_is_the_coming_night_after_sunrise() -> None:
+    """From sunrise to local noon, "tonight" is the coming night, not the past one."""
+    series = _series()
+    planner = Planner(SiteConfig("Test", LATITUDE, LONGITUDE, 100), load_catalog())
+    sunrise = compute_night(planner.site.location, date(2026, 10, 13), with_planets=False).sunrise
+    assert sunrise is not None
+    noon = night_window(date(2026, 10, 14), LONGITUDE)[0]
+    assert sunrise < noon
+    expected = (
+        (sunrise - timedelta(minutes=5), date(2026, 10, 13)),
+        (sunrise + timedelta(minutes=5), date(2026, 10, 14)),
+        (noon - timedelta(minutes=5), date(2026, 10, 14)),
+        (noon + timedelta(minutes=5), date(2026, 10, 14)),
+    )
+    for moment, night in expected:
+        # Timeline built as the coordinator does (from the noon-based night).
+        start = night_window(night_date_for(moment, LONGITUDE), LONGITUDE)[0]
+        timeline = w.build_timeline(series, moment, 100, start=start)
+        forecast = planner.compute(moment, timeline)
+        assert forecast.tonight.ephem.night == night, moment
+        assert forecast.tonight.has_weather, moment
+        assert forecast.tonight.deep_sky.score is not None, moment
+        assert forecast.tonight.ephem.planets, moment
+        dates = [n.ephem.night for n in forecast.nights]
+        assert dates == [night + timedelta(days=i) for i in range(len(dates))]
+
+
+def test_tonight_keeps_noon_boundary_without_sunrise() -> None:
+    """Polar day: no sunrise, so the night still changes at local noon."""
+    planner = Planner(SiteConfig("Polar", 78.0, 15.0, 0), load_catalog())
+    morning = datetime(2026, 6, 21, 8, tzinfo=UTC)  # 09:00 local mean solar time
+    assert planner.compute(morning, None).tonight.ephem.night == date(2026, 6, 20)
+    afternoon = datetime(2026, 6, 21, 13, tzinfo=UTC)
+    assert planner.compute(afternoon, None).tonight.ephem.night == date(2026, 6, 21)
 
 
 def _reference_position(q: float, e: float, dt: float) -> tuple[float, float]:
@@ -217,3 +256,11 @@ async def test_storage_removed_with_entry(
     assert await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()
     assert key not in hass_storage
+
+
+def test_card_version_matches_manifest() -> None:
+    """The version printed by the card follows the integration version."""
+    root = Path(__file__).parent.parent / "custom_components" / "astrocast"
+    version = json.loads((root / "manifest.json").read_text())["version"]
+    card = (root / "frontend" / "astrocast-card.js").read_text()
+    assert f'const VERSION = "{version}";' in card

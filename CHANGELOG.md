@@ -3,6 +3,13 @@
 All notable changes to AstroCast are documented here. The project follows
 [semantic versioning](https://semver.org/); 0.x releases are beta releases.
 
+## [0.1.1] – 2026-10-14
+
+### Fixed
+- "Tonight" now switches to the coming night at sunrise instead of local solar noon: in the
+  morning, the tonight sensors, favourites, calendars and the card no longer describe the night
+  that has just ended (automations run in the morning now see the right night).
+
 ## [0.1.0] – 2026-10-14
 
 First public beta.
