@@ -1,0 +1,56 @@
+name: Release
+
+# Publishing a version:
+#   1. set "version" in custom_components/astrocast/manifest.json,
+#   2. add a "## [x.y.z] – date" section to CHANGELOG.md,
+#   3. push the tag: git tag vx.y.z && git push origin vx.y.z
+# This workflow checks that the tag matches the manifest and publishes the
+# GitHub release with the changelog section as notes. 0.x versions and
+# versions with a pre-release suffix (b1, rc1…) are marked as pre-releases.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the version and extract the release notes
+        id: notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          manifest="$(jq -r .version custom_components/astrocast/manifest.json)"
+          if [ "$version" != "$manifest" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match the manifest version $manifest"
+            exit 1
+          fi
+          awk -v v="$version" '
+            /^## \[/ { if (found) exit; if (index($0, "[" v "]")) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if ! grep -q '[^[:space:]]' release-notes.md; then
+            echo "::error::CHANGELOG.md has no section for $version"
+            exit 1
+          fi
+          case "$version" in
+            0.* | *a* | *b* | *rc* | *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ steps.notes.outputs.prerelease }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "AstroCast $GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --verify-tag \
+            --prerelease="$PRERELEASE"
