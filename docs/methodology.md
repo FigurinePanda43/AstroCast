@@ -60,23 +60,42 @@ Each provider returns a time series; they are merged hour by hour (`engine/weath
 For every 15-minute sample, the score is
 
 ```
-score = 100 × clouds × precipitation × darkness × moon × transparency × seeing × wind × humidity
+score = 100 × clouds × precipitation × darkness × moon × transparency × seeing × wind × humidity × dew
 ```
 
 Each factor is in [0, 1]. A product means that one fatal limitation (overcast, daylight, rain)
 is enough to make the score zero, which matches the experience of observers. The factor with
 the lowest average over the best window is reported as the **limiting factor**.
 
-| Factor | Deep sky | Planetary |
-| --- | --- | --- |
-| Clouds *c* | (1 − c)^1.6 | (1 − c)^1.1 (planets show through gaps) |
-| Precipitation | 0 if rain ≥ 0.2 mm/h, reduced with rain probability > 20 % | same |
-| Darkness (Sun altitude) | 1 below −18°, 0.55 at −15°, 0 above −12° | 1 below −8°, 0 above −1° |
-| Moon | 10^(−0.2 Δm) (see below) | 1 |
-| Transparency *k* | 10^(−0.4·max(0, k − 0.15)·1.3) | same ^0.4 |
-| Seeing | table (1.0 at 0.8″, 0.78 at 1.5″, 0.6 at 2″, 0.3 at 3″) ^0.35 | same table |
-| Wind (max of wind, 0.6 × gusts) | 1 up to 12 km/h, 0.7 at 30, 0.22 at 55 | same ^0.8 |
-| Humidity / fog | 1 up to 85 %, 0.82 at 95 %, 0.68 at 100 %; fog reduces it further | same |
+Three profiles are computed: **deep sky** (visual or broadband imaging of faint objects),
+**planetary** (Moon, planets, double stars) and **narrowband** (emission nebulae imaged
+through 3–7 nm Hα, OIII or SII filters).
+
+| Factor | Deep sky | Planetary | Narrowband |
+| --- | --- | --- | --- |
+| Clouds *c* | (1 − c)^1.6 | (1 − c)^1.1 (planets show through gaps) | as deep sky |
+| Precipitation | 0 if rain ≥ 0.2 mm/h, reduced with rain probability > 20 % | same | same |
+| Darkness (Sun altitude) | 1 below −18°, 0.55 at −15°, 0 above −12° | 1 below −8°, 0 above −1° | 1 below −15°, 0.6 at −12°, 0 above −10° |
+| Moon | 10^(−0.2 Δm) (see below) | 1 | 10^(−0.2 × 0.25 Δm) |
+| Transparency *k* | 10^(−0.4·max(0, k − 0.15)·1.3) | same ^0.4 | same ^0.8 |
+| Seeing | table (1.0 at 0.8″, 0.78 at 1.5″, 0.6 at 2″, 0.3 at 3″) ^0.35 | same table | as deep sky |
+| Wind (max of wind, 0.6 × gusts) | 1 up to 12 km/h, 0.7 at 30, 0.22 at 55 | same ^0.8 | as deep sky |
+| Humidity / fog | 1 up to 85 %, 0.82 at 95 %, 0.68 at 100 %; fog reduces it further | same | same |
+| Dew (see below) | 1 with a margin ≥ 3 °C, 0.3 once dew has formed (without heaters) | same | same |
+
+**Narrowband.** A narrowband filter passes the emission lines of the nebula but only a few
+nanometres of the moonlit (continuum) sky, so the moonlight brightening counts for a quarter
+of its deep-sky weight, and imaging can start at the end of nautical twilight. Broadband
+targets (galaxies, clusters, reflection nebulae) still need the deep-sky score.
+
+**Dew.** Optics exposed to a clear, calm sky cool by radiation about 2 °C below the air.
+The *optics margin* is `(T − Td) − 2 °C × clear fraction × calm factor` (calm factor 1 without
+wind, 0 from 15 km/h). Dew forms on unprotected optics when the margin drops below 0.5 °C;
+from that moment the rest of the night gets a 0.3 factor (wet optics, the session is over).
+Before that, a shrinking margin costs a little (0.97 at 2 °C, 0.9 at 1 °C). With the *dew
+heaters* option, there is no onset: the factor only drops to 0.95 at a zero margin and 0.85
+at −2 °C (saturated, hazy air). The night summary gives the expected onset time and the
+lowest margin; the dew risk sensor gives the current level (high ≤ 0.5 °C, moderate ≤ 2 °C).
 
 **Moonlight.** The sky brightening Δm (mag/arcsec²) caused by the Moon is computed with the
 Krisciunas & Schaefer (1991) model from the lunar phase angle, the Moon–target separation, both
@@ -91,10 +110,23 @@ use the object's own position.
 
 ### Night score and windows
 
-* The **night score** is the mean score of the best continuous 3-hour block within the usable
-  darkness (shorter when the night itself is shorter) — "how good can a typical session be
-  tonight?".
-* The **best window** extends that block while the score stays above max(35, 0.8 × block score).
+* The **night score** is the value of the best continuous **session**: over every window of
+  the usable darkness, `mean score × duration factor(length)`, and the best window wins.
+  Long exposures need long windows, so a two-hour clearing is not a good night:
+
+  | Session length | 1 h | 2 h | 3 h | 4 h | 5 h | 6 h |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | Deep sky / narrowband | 0.35 | 0.6 | 0.78 | 0.9 | 0.97 | 1 |
+  | Planetary | 0.7 | 0.92 | 1 | 1 | 1 | 1 |
+
+  A session only spans samples worth at least half of the night's best level (90th
+  percentile), with dips of up to 30 minutes bridged (a passing cloud), so it cannot gain
+  length with clouded or dewed-up hours. When part of the night is beyond the forecast range,
+  the duration factor is normalised by the known hours, so missing data is not mistaken for
+  a short window. When the duration factor is the weakest factor, the limiting factor is
+  reported as `duration` ("short window").
+* The **best window** is that session (reported when its mean score is at least 35), with its
+  length (`window_hours`), its mean quality (`window_quality`) and its duration factor.
 * **Good hours** counts the samples above your threshold.
 * **Potential** is the same computation assuming a clear sky with average transparency and
   seeing: it is used beyond the weather horizon (dark-sky planning) and drawn as a faint curve.

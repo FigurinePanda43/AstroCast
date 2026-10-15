@@ -1,0 +1,69 @@
+blueprint:
+  name: AstroCast – Observing window ahead
+  description: >-
+    Notifies a phone before an AstroCast observing window starts (a deep-sky,
+    planetary or narrowband window above your threshold). The message gives the
+    window, its length, the expected conditions and the dew onset.
+
+
+    Prévient un téléphone avant le début d'une fenêtre d'observation AstroCast
+    (ciel profond, planétaire ou bande étroite au-dessus de votre seuil). Le
+    message indique la fenêtre, sa durée, les conditions prévues et l'heure de
+    la rosée.
+  domain: automation
+  author: AstroCast
+  source_url: https://github.com/FigurinePanda43/AstroCast/blob/main/blueprints/automation/astrocast/observing_window.yaml
+  homeassistant:
+    min_version: 2025.1.0
+  input:
+    windows_calendar:
+      name: Observing windows calendar / Calendrier des fenêtres
+      description: The "Observing windows" calendar of an AstroCast site.
+      selector:
+        entity:
+          filter:
+            - integration: astrocast
+              domain: calendar
+    lead_time:
+      name: Notify before the start / Prévenir avant le début
+      default: "-02:00:00"
+      selector:
+        select:
+          options:
+            - label: 30 min
+              value: "-00:30:00"
+            - label: 1 h
+              value: "-01:00:00"
+            - label: 2 h
+              value: "-02:00:00"
+            - label: 3 h
+              value: "-03:00:00"
+            - label: 6 h
+              value: "-06:00:00"
+    notify_device:
+      name: Phone to notify / Téléphone à prévenir
+      description: A device of the Home Assistant Companion app.
+      selector:
+        device:
+          filter:
+            - integration: mobile_app
+
+mode: queued
+max_exceeded: silent
+
+triggers:
+  - trigger: calendar
+    event: start
+    entity_id: !input windows_calendar
+    offset: !input lead_time
+
+actions:
+  - domain: mobile_app
+    type: notify
+    device_id: !input notify_device
+    title: "🔭 {{ trigger.calendar_event.summary }}"
+    message: >-
+      {{ as_timestamp(trigger.calendar_event.start) | timestamp_custom('%H:%M') }} →
+      {{ as_timestamp(trigger.calendar_event.end) | timestamp_custom('%H:%M') }}
+
+      {{ trigger.calendar_event.description }}

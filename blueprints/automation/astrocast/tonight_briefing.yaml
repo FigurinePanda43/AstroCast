@@ -1,0 +1,134 @@
+blueprint:
+  name: AstroCast – Tonight's briefing
+  description: >-
+    Every day at the chosen time, sends tonight's score, best window and its
+    length, the main limitation and the dew onset when the night reaches a
+    minimum score. Use the deep-sky, planetary or narrowband "tonight" sensor.
+
+
+    Chaque jour à l'heure choisie, envoie le score de la nuit, la meilleure
+    fenêtre et sa durée, la principale limitation et l'heure de la rosée quand
+    la nuit atteint un score minimum. Choisissez le capteur « ce soir » ciel
+    profond, planétaire ou bande étroite.
+  domain: automation
+  author: AstroCast
+  source_url: https://github.com/FigurinePanda43/AstroCast/blob/main/blueprints/automation/astrocast/tonight_briefing.yaml
+  homeassistant:
+    min_version: 2025.1.0
+  input:
+    score_sensor:
+      name: Tonight score sensor / Capteur du score de la nuit
+      description: e.g. "Deep sky tonight" / « Ciel profond ce soir ».
+      selector:
+        entity:
+          filter:
+            - integration: astrocast
+              domain: sensor
+    time:
+      name: Time of the briefing / Heure du bilan
+      default: "17:00:00"
+      selector:
+        time:
+    minimum_score:
+      name: Minimum score / Score minimum
+      default: 50
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 5
+    notify_device:
+      name: Phone to notify / Téléphone à prévenir
+      selector:
+        device:
+          filter:
+            - integration: mobile_app
+    language:
+      name: Message language / Langue du message
+      default: en
+      selector:
+        select:
+          options:
+            - label: English
+              value: en
+            - label: Français
+              value: fr
+
+mode: single
+
+triggers:
+  - trigger: time
+    at: !input time
+
+variables:
+  sensor: !input score_sensor
+  minimum_score: !input minimum_score
+  lang: !input language
+  score: "{{ states(sensor) | int(-1) }}"
+  texts:
+    en:
+      title: Tonight
+      ratings: {excellent: excellent, good: good, fair: fair, poor: poor, bad: bad}
+      window: Best window
+      limit: Main limitation
+      dew: Dew around
+      factors:
+        clouds: clouds
+        precipitation: rain
+        darkness: twilight
+        moon: the Moon
+        transparency: transparency
+        seeing: seeing
+        wind: wind
+        humidity: humidity
+        dew: dew
+        duration: a short window
+    fr:
+      title: Ce soir
+      ratings: {excellent: excellente, good: bonne, fair: moyenne, poor: médiocre, bad: mauvaise}
+      window: Meilleure fenêtre
+      limit: Principale limitation
+      dew: Rosée vers
+      factors:
+        clouds: les nuages
+        precipitation: la pluie
+        darkness: le crépuscule
+        moon: la Lune
+        transparency: la transparence
+        seeing: la turbulence
+        wind: le vent
+        humidity: l'humidité
+        dew: la rosée
+        duration: une fenêtre trop courte
+
+conditions:
+  - condition: template
+    value_template: "{{ score >= minimum_score }}"
+
+actions:
+  - domain: mobile_app
+    type: notify
+    device_id: !input notify_device
+    title: >-
+      🔭 {{ texts[lang].title }}{{ ' : ' if lang == 'fr' else ': ' }}{{ score }}/100
+      ({{ texts[lang].ratings.get(state_attr(sensor, 'rating'), '') }})
+    message: >-
+      {% set t = texts[lang] %}
+      {% set start = state_attr(sensor, 'window_start') %}
+      {% set end = state_attr(sensor, 'window_end') %}
+      {% set hours = state_attr(sensor, 'window_hours') | float(0) %}
+      {% set limiting = state_attr(sensor, 'limiting_factor') %}
+      {% set dew = state_attr(sensor, 'dew_onset') %}
+      {% set lines = [] %}
+      {% if start and end %}
+        {% set m = (hours * 60) | round(0) | int %}
+        {% set length = (m // 60) ~ ' h' ~ ((' %02d' | format(m % 60)) if m % 60 else '') %}
+        {% set lines = lines + [t.window ~ ' ' ~ (as_timestamp(start) | timestamp_custom('%H:%M')) ~ ' → ' ~ (as_timestamp(end) | timestamp_custom('%H:%M')) ~ ' (' ~ length ~ ')'] %}
+      {% endif %}
+      {% if limiting %}
+        {% set lines = lines + [t.limit ~ (' : ' if lang == 'fr' else ': ') ~ t.factors.get(limiting, limiting)] %}
+      {% endif %}
+      {% if dew %}
+        {% set lines = lines + [t.dew ~ ' ' ~ (as_timestamp(dew) | timestamp_custom('%H:%M'))] %}
+      {% endif %}
+      {{ lines | join('\n') }}

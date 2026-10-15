@@ -1,0 +1,85 @@
+blueprint:
+  name: AstroCast – Dew heaters
+  description: >-
+    Switches dew heaters on when the AstroCast dew risk reaches the chosen level
+    (while the Sun is down) and off when the risk becomes low again or at
+    sunrise. Works with any switch, light, fan or input boolean.
+
+
+    Allume les résistances anti-rosée quand le risque de rosée AstroCast atteint
+    le niveau choisi (Soleil couché) et les éteint quand le risque redevient
+    faible ou au lever du Soleil. Fonctionne avec tout interrupteur, lumière,
+    ventilateur ou booléen.
+  domain: automation
+  author: AstroCast
+  source_url: https://github.com/FigurinePanda43/AstroCast/blob/main/blueprints/automation/astrocast/dew_heaters.yaml
+  homeassistant:
+    min_version: 2025.1.0
+  input:
+    dew_risk:
+      name: Dew risk sensor / Capteur de risque de rosée
+      selector:
+        entity:
+          filter:
+            - integration: astrocast
+              domain: sensor
+              device_class: enum
+    heaters:
+      name: Dew heaters / Résistances chauffantes
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain:
+                - switch
+                - light
+                - fan
+                - input_boolean
+    level:
+      name: Switch on from / Allumer à partir de
+      default: moderate
+      selector:
+        select:
+          options:
+            - label: Moderate risk / Risque modéré
+              value: moderate
+            - label: High risk / Risque élevé
+              value: high
+
+mode: restart
+
+triggers:
+  - trigger: state
+    entity_id: !input dew_risk
+    to: ~
+    id: risk
+  - trigger: sun
+    event: sunrise
+    id: sunrise
+  - trigger: sun
+    event: sunset
+    id: sunset
+
+variables:
+  dew_risk: !input dew_risk
+  level: !input level
+  risk: "{{ states(dew_risk) }}"
+  levels: "{{ ['moderate', 'high'] if level == 'moderate' else ['high'] }}"
+  dark: "{{ trigger.id == 'sunset' or is_state('sun.sun', 'below_horizon') }}"
+
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'sunrise' or risk == 'low' }}"
+        sequence:
+          - action: homeassistant.turn_off
+            target:
+              entity_id: !input heaters
+      - conditions:
+          - condition: template
+            value_template: "{{ dark and risk in levels }}"
+        sequence:
+          - action: homeassistant.turn_on
+            target:
+              entity_id: !input heaters

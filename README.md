@@ -56,8 +56,12 @@ exposes useful entities, calendars and actions for automations — plus a dedica
   - *ECMWF ensemble* (51 members): probability of clear sky and forecast confidence — 15 days.
   - *CAMS aerosols*: dust and smoke for an objective transparency estimate — 5 days.
   - *MET Norway*: automatic fallback when Open-Meteo is unavailable.
-- **Explainable scores** — each score is a product of physical factors; the weakest one is
-  reported as the limiting factor. Every value carries its source, forecast tier
+- **Explainable scores, for how you observe** — *deep sky*, *planetary* and *narrowband*
+  (emission nebulae through Hα/OIII/SII filters, which still work under the Moon). Each score
+  is a product of physical factors; the weakest one is reported as the limiting factor. A
+  night is judged on its best **continuous session**: a two-hour clearing is not a good night
+  for long exposures, and **dew** on unprotected optics ends the session (tell AstroCast if
+  you have dew heaters). Every value carries its source, forecast tier
   (`detailed` / `forecast` / `trend`) and a confidence level. Estimates are never shown as
   measurements. → [Methodology](docs/methodology.md)
 - **What to observe** — 635 deep-sky objects (all Messier and Caldwell objects, bright NGC/IC,
@@ -71,7 +75,8 @@ exposes useful entities, calendars and actions for automations — plus a dedica
 - **Home Assistant native** — UI config flow with a map, reconfigure and options flows,
   multiple sites, translated (English/French) entities, calendars for notifications,
   actions with responses, diagnostics, a Lovelace card and a sidebar panel that install
-  themselves (no resource to add, no YAML).
+  themselves (no resource to add, no YAML), with a **red night-vision mode**, and
+  ready-made **automation blueprints**.
 - **Robust and light** — each provider is refreshed on its own schedule, with back-off,
   persistent cache and graceful degradation (astronomy keeps working with no network at
   all). Heavy computations run in an executor and take ~0.5 s per update on a desktop x86 CPU
@@ -102,7 +107,9 @@ Python, and `numpy`, already shipped with Home Assistant) are installed automati
    <img src="docs/images/config-flow.png" width="420" alt="Adding an observing site on the map">
 
 2. **How you observe** — sky darkness (Bortle scale), main equipment, lowest usable altitude
-   (trees, buildings…) and the score above which conditions are considered *good*.
+   (trees, buildings…), the score above which conditions are considered *good*, and whether
+   your optics have **dew heaters** (without them, the scores assume the session ends when
+   dew forms).
 
 Add the integration again for each additional site. Use **Reconfigure** to move or rename a
 site and **Configure** (options) to change preferences, set a measured SQM value, describe
@@ -119,12 +126,18 @@ type: custom:astrocast-card
 # entry_id: 0123456789abcdef   # optional: a specific site (default: the first one)
 # default_tab: nights          # tonight | nights | objects | events | sky
 # view: compact                # header only (scores, best window, Moon, twilight)
+# night_mode: auto             # on | auto (red after sunset); default: a button in the header
 ```
 
 Tabs: **Tonight** (timeline with twilight, scores, clouds, Moon, best window; tap to inspect
 any time), **Nights** (outlook with tier and confidence, then dark-sky potential),
 **Objects** (recommendations with reasons, search, favourites), **Events**, **Sky**
 (all-sky chart of the planets and best targets for any time tonight).
+
+**Night vision:** the red eye button in the header switches the card and the panel to shades
+of pure red on black (no green or blue light at all, to keep your dark adaptation). The
+choice is remembered on each device; `night_mode: on` or `auto` forces it from the card
+configuration.
 
 ## Entities
 
@@ -134,9 +147,12 @@ Per site (`<site>` is the site name):
 | --- | --- |
 | `sensor.<site>_deep_sky_tonight` | Deep-sky score of the night (0–100) — attributes: rating, best window, limiting factor, confidence, Moon, twilight… |
 | `sensor.<site>_planetary_tonight` | Same for planetary/lunar observing |
-| `sensor.<site>_deep_sky_now` / `_planetary_now` | Current scores with every factor |
+| `sensor.<site>_narrowband_tonight` | Same for narrowband imaging (Hα, OIII, SII filters) |
+| `sensor.<site>_deep_sky_now` / `_planetary_now` / `_narrowband_now` | Current scores with every factor |
 | `sensor.<site>_best_upcoming_night` | Start of the best upcoming window; attributes list every night |
 | `sensor.<site>_cloud_cover` | Current cloud cover (with clear-sky probability) |
+| `sensor.<site>_dew_risk` | Dew risk on unprotected optics now (`low` / `moderate` / `high`), with the optics margin to the dew point |
+| `sensor.<site>_dew_expected_tonight` | When dew is expected to form tonight (unknown when none is expected) |
 | `sensor.<site>_seeing` · `_transparency_extinction` | Seeing (″) and V-band extinction (mag/airmass) — *disabled by default* |
 | `sensor.<site>_moon_phase` · `_moon_illumination` | Lunar phase and illuminated fraction |
 | `sensor.<site>_next_moonrise` · `_next_moonset` | *disabled by default* |
@@ -154,6 +170,20 @@ Per site (`<site>` is the site name):
 Large lists are kept out of the recorder to protect your database.
 
 ## Automations
+
+### Blueprints
+
+Import a ready-made automation in two clicks (Home Assistant 2025.1 or newer):
+
+| | Blueprint | What it does |
+| --- | --- | --- |
+| [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFigurinePanda43%2FAstroCast%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fastrocast%2Fobserving_window.yaml) | **Observing window ahead** | Phone notification 30 min to 6 h before a window of the *Observing windows* calendar, with its length, conditions and dew onset |
+| [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFigurinePanda43%2FAstroCast%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fastrocast%2Ftonight_briefing.yaml) | **Tonight's briefing** | Daily message at the time you choose (e.g. 17:00) when tonight reaches a minimum score: score, best window and length, main limitation, dew |
+| [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFigurinePanda43%2FAstroCast%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fastrocast%2Ffavorite_window.yaml) | **Favourite object well placed** | Notification before the next favourable window of a favourite object |
+| [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFigurinePanda43%2FAstroCast%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fastrocast%2Fastronomical_event.yaml) | **Astronomical event** | Reminder before events of the *Astronomical events* calendar, optionally filtered by keywords (e.g. meteor, eclipse) |
+| [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFigurinePanda43%2FAstroCast%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fastrocast%2Fdew_heaters.yaml) | **Dew heaters** | Switches dew heaters on from a chosen dew risk (Sun down) and off when the risk is low again or at sunrise |
+
+### By hand
 
 Calendars are the easiest way to be warned *before* a good night:
 
@@ -180,7 +210,7 @@ meteor shower reminder, favourite object alert, using the actions in scripts) ar
 
 | Action | Description |
 | --- | --- |
-| `astrocast.get_forecast` | Nights with both scores, windows, weather summary, top objects and events (response) |
+| `astrocast.get_forecast` | Nights with every score, windows and their length, weather summary with dew onset, top objects and events (response) |
 | `astrocast.get_object_visibility` | Best moments for any object (`Jupiter`, `M31`, `NGC 7000`, `Orion Nebula`…) over 16 nights (response) |
 | `astrocast.add_favorite` / `astrocast.remove_favorite` | Manage favourites |
 
@@ -208,6 +238,9 @@ services above, nothing else. Diagnostics round them to ~10 km.
   proxy, and comet magnitudes are notoriously uncertain — both are labelled as estimates.
 - Light pollution is taken from your Bortle setting (or SQM); there is no automatic
   light-pollution map.
+- Dew is estimated from the forecast temperature, dew point, cloud cover and wind (optics
+  cool by radiation under a clear calm sky); local conditions (valley bottom, grass, dew
+  shield) can differ.
 - The catalog focuses on the ~600 most rewarding deep-sky objects; double stars and
   variable stars are not covered yet.
 - The horizon profile is a simple polyline of `azimuth:altitude` points (no import of

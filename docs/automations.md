@@ -1,5 +1,10 @@
 # Automation and script examples
 
+> **Ready-made blueprints** cover the most common cases (window ahead, tonight's briefing,
+> favourite object, astronomical event, dew heaters): see the
+> [Blueprints section of the README](../README.md#blueprints). The examples below are for
+> writing your own automations.
+
 Replace `garden` with the name of your site (entity ids are built from it) and
 `notify.mobile_app_phone` with your notifier.
 
@@ -101,6 +106,27 @@ Each favourite has a timestamp sensor with its next favourable window (here M 42
         message: >-
           The Orion Nebula is well placed in one hour
           (score {{ state_attr('sensor.garden_m_42_orion_nebula_next_window', 'next_window_score') }}).
+```
+
+## Switch the dew heaters on before dew forms
+
+`sensor.garden_dew_expected_tonight` holds the time dew is expected on unprotected optics
+(unknown when none is expected); a time trigger can use it with an offset.
+
+```yaml
+- alias: "AstroCast – dew heaters"
+  triggers:
+    - trigger: time
+      at:
+        entity_id: sensor.garden_dew_expected_tonight
+        offset: "-00:20:00"
+    - trigger: state
+      entity_id: sensor.garden_dew_risk
+      to: high
+  actions:
+    - action: switch.turn_on
+      target:
+        entity_id: switch.dew_heaters
 ```
 
 ## Using the actions in a script

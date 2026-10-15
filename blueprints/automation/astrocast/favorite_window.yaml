@@ -1,0 +1,98 @@
+blueprint:
+  name: AstroCast – Favourite object well placed
+  description: >-
+    Notifies a phone before the next favourable window of an AstroCast
+    favourite object (sensor "… next window" created for each favourite).
+
+
+    Prévient un téléphone avant la prochaine fenêtre favorable d'un objet favori
+    AstroCast (capteur « … prochaine fenêtre » créé pour chaque favori).
+  domain: automation
+  author: AstroCast
+  source_url: https://github.com/FigurinePanda43/AstroCast/blob/main/blueprints/automation/astrocast/favorite_window.yaml
+  homeassistant:
+    min_version: 2025.1.0
+  input:
+    favorite:
+      name: Favourite sensor / Capteur du favori
+      description: The "next window" sensor of a favourite object.
+      selector:
+        entity:
+          filter:
+            - integration: astrocast
+              domain: sensor
+              device_class: timestamp
+    lead_time:
+      name: Notify before the window / Prévenir avant la fenêtre
+      default: "-01:00:00"
+      selector:
+        select:
+          options:
+            - label: 15 min
+              value: "-00:15:00"
+            - label: 30 min
+              value: "-00:30:00"
+            - label: 1 h
+              value: "-01:00:00"
+            - label: 2 h
+              value: "-02:00:00"
+            - label: 3 h
+              value: "-03:00:00"
+    minimum_score:
+      name: Minimum score / Score minimum
+      default: 50
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 5
+    notify_device:
+      name: Phone to notify / Téléphone à prévenir
+      selector:
+        device:
+          filter:
+            - integration: mobile_app
+    language:
+      name: Message language / Langue du message
+      default: en
+      selector:
+        select:
+          options:
+            - label: English
+              value: en
+            - label: Français
+              value: fr
+
+mode: queued
+max_exceeded: silent
+
+triggers:
+  - trigger: time
+    at:
+      entity_id: !input favorite
+      offset: !input lead_time
+
+variables:
+  favorite: !input favorite
+  minimum_score: !input minimum_score
+  lang: !input language
+  name: "{{ state_attr(favorite, 'name') or state_attr(favorite, 'friendly_name') }}"
+  score: "{{ state_attr(favorite, 'next_window_score') | int(0) }}"
+  start: "{{ as_timestamp(states(favorite), 0) | timestamp_custom('%H:%M') }}"
+  end: >-
+    {% set end = state_attr(favorite, 'next_window_end') %}
+    {{ as_timestamp(end) | timestamp_custom('%H:%M') if end else '' }}
+
+conditions:
+  - condition: template
+    value_template: "{{ score >= minimum_score }}"
+
+actions:
+  - domain: mobile_app
+    type: notify
+    device_id: !input notify_device
+    title: "⭐ {{ name }}"
+    message: >-
+      {% if lang == 'fr' %}Fenêtre favorable {{ start }}{{ ' → ' ~ end if end }}
+      (score {{ score }}/100).{% else %}Favourable window {{ start }}{{ ' → ' ~ end if end }}
+      (score {{ score }}/100).{% endif %}
