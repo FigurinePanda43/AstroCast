@@ -100,31 +100,35 @@ async def test_blueprints_are_valid(
 ) -> None:
     """Every blueprint creates a working automation."""
     await _setup(hass, phone)
-    for name in BLUEPRINTS:
-        state = hass.states.get(f"automation.{name.removesuffix('.yaml')}")
-        assert state is not None, name
-        assert state.state == "on", (name, state.attributes)
-    await _stop(hass)
+    try:
+        for name in BLUEPRINTS:
+            state = hass.states.get(f"automation.{name.removesuffix('.yaml')}")
+            assert state is not None, name
+            assert state.state == "on", (name, state.attributes)
+    finally:
+        await _stop(hass)
 
 
 async def test_dew_heaters_follow_the_risk(
     hass: HomeAssistant, setup_integration, blueprints, phone
 ) -> None:
     await _setup(hass, phone)
-    risk = _entity(hass, "dew_risk")
-    hass.states.async_set("sun.sun", "below_horizon")
-    hass.states.async_set(risk, "moderate")
-    await hass.async_block_till_done()
-    assert hass.states.get("input_boolean.heater").state == "on"
-    hass.states.async_set(risk, "low")
-    await hass.async_block_till_done()
-    assert hass.states.get("input_boolean.heater").state == "off"
-    # Not during the day.
-    hass.states.async_set("sun.sun", "above_horizon")
-    hass.states.async_set(risk, "high")
-    await hass.async_block_till_done()
-    assert hass.states.get("input_boolean.heater").state == "off"
-    await _stop(hass)
+    try:
+        risk = _entity(hass, "dew_risk")
+        hass.states.async_set("sun.sun", "below_horizon")
+        hass.states.async_set(risk, "moderate")
+        await hass.async_block_till_done()
+        assert hass.states.get("input_boolean.heater").state == "on"
+        hass.states.async_set(risk, "low")
+        await hass.async_block_till_done()
+        assert hass.states.get("input_boolean.heater").state == "off"
+        # Not during the day.
+        hass.states.async_set("sun.sun", "above_horizon")
+        hass.states.async_set(risk, "high")
+        await hass.async_block_till_done()
+        assert hass.states.get("input_boolean.heater").state == "off"
+    finally:
+        await _stop(hass)
 
 
 def _blueprint(name: str) -> dict[str, Any]:
