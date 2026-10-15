@@ -14,6 +14,15 @@ const STRINGS = {
   en: {
     deep_sky: "Deep sky",
     planetary: "Planetary",
+    narrowband: "Narrowband",
+    narrowband_hint: "Moonlit night: narrowband filters (Hα, OIII, SII) still work",
+    dew_at: "Dew around",
+    dew_heaters: "heaters",
+    night_mode: "Night vision (red)",
+    editor_night: "Night vision (red)",
+    editor_night_toggle: "Button in the card",
+    editor_night_on: "Always",
+    editor_night_auto: "Automatic after sunset",
     now: "Now",
     tonight: "Tonight",
     nights: "Nights",
@@ -40,6 +49,7 @@ const STRINGS = {
     humidity: "Humidity",
     wind: "Wind",
     temperature: "Temperature",
+    dew_point: "Dew point",
     dew_risk: "Dew risk",
     clear_chance: "Clear-sky chance",
     score: "Score",
@@ -160,6 +170,15 @@ const STRINGS = {
   fr: {
     deep_sky: "Ciel profond",
     planetary: "Planétaire",
+    narrowband: "Bande étroite",
+    narrowband_hint: "Nuit éclairée par la Lune : les filtres à bande étroite (Hα, OIII, SII) restent utilisables",
+    dew_at: "Rosée vers",
+    dew_heaters: "résistances",
+    night_mode: "Vision nocturne (rouge)",
+    editor_night: "Vision nocturne (rouge)",
+    editor_night_toggle: "Bouton dans la carte",
+    editor_night_on: "Toujours",
+    editor_night_auto: "Automatique après le coucher du soleil",
     now: "Maintenant",
     tonight: "Cette nuit",
     nights: "Nuits",
@@ -186,7 +205,8 @@ const STRINGS = {
     humidity: "Humidité",
     wind: "Vent",
     temperature: "Température",
-    dew_risk: "Risque de buée",
+    dew_point: "Point de rosée",
+    dew_risk: "Risque de rosée",
     clear_chance: "Probabilité de ciel dégagé",
     score: "Score",
     potential: "Si dégagé",
@@ -315,6 +335,9 @@ const RATING_COLORS = {
 };
 const DEEP_COLOR = "#6c7cff";
 const PLANET_COLOR = "#ffa23a";
+const NARROW_COLOR = "#e0569b";
+const NIGHT_KEY = "astrocast-night-mode";
+const NIGHT_EVENT = "astrocast-night-mode";
 const MOON_COLOR = "#c9cfd8";
 
 const esc = (value) =>
@@ -330,6 +353,23 @@ function ratingOf(score) {
   if (score >= 35) return "fair";
   if (score >= 15) return "poor";
   return "bad";
+}
+
+function fmtHours(hours) {
+  const minutes = Math.round((hours || 0) * 60);
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h} h ${String(m).padStart(2, "0")}` : `${h} h`;
+}
+
+let nightFallback = false; // used when the browser storage is unavailable
+
+function storedNightMode() {
+  try {
+    return window.localStorage.getItem(NIGHT_KEY) === "on";
+  } catch (_e) {
+    return nightFallback;
+  }
 }
 
 function confidenceKey(value) {
@@ -394,6 +434,7 @@ const STYLES = `
 :host {
   --ac-deep: ${DEEP_COLOR};
   --ac-planet: ${PLANET_COLOR};
+  --ac-narrow: ${NARROW_COLOR};
   --ac-moon: ${MOON_COLOR};
   --ac-moon-lit: #f3f1e8;
   --ac-moon-dark: rgba(127,127,140,.35);
@@ -411,14 +452,14 @@ const STYLES = `
 .health { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--ac-muted); cursor: pointer; background: none; border: none; padding: 4px 6px; border-radius: 8px; font-family: inherit; }
 .health:hover { background: var(--ac-chip); }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
-.score { border-radius: var(--ac-radius); padding: 10px 12px; background: var(--ac-chip); position: relative; overflow: hidden; }
-.score .label { font-size: .8rem; color: var(--ac-muted); display: flex; justify-content: space-between; gap: 6px; }
+.scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-top: 12px; }
+.score { border-radius: var(--ac-radius); padding: 9px 10px; background: var(--ac-chip); position: relative; overflow: hidden; min-width: 0; }
+.score .label { font-size: .76rem; color: var(--ac-muted); display: flex; justify-content: space-between; gap: 6px; line-height: 1.25; }
 .score .value { font-size: 2rem; font-weight: 700; line-height: 1.1; margin-top: 2px; }
 .score .value small { font-size: .9rem; font-weight: 500; color: var(--ac-muted); }
 .score .rating { font-size: .85rem; font-weight: 600; }
 .score .bar { position: absolute; left: 0; bottom: 0; height: 4px; }
-.score .now { font-size: .75rem; color: var(--ac-muted); margin-top: 2px; }
+.score .now { font-size: .72rem; color: var(--ac-muted); margin-top: 2px; line-height: 1.3; }
 .summary { margin-top: 10px; font-size: .88rem; line-height: 1.45; }
 .summary b { font-weight: 600; }
 .facts { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: .82rem; color: var(--ac-muted); align-items: center; }
@@ -484,6 +525,22 @@ input[type=range] { width: 100%; accent-color: var(--primary-color); }
 .attribution { font-size: .66rem; color: var(--ac-muted); margin-top: 12px; line-height: 1.35; }
 .two-col { display: grid; gap: 0 24px; }
 @media (min-width: 1100px) { .panel .two-col { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); } }
+.nightbtn { color: #d33; }
+.nightbtn[aria-pressed="true"] { background: var(--ac-chip); }
+/* Night vision: everything is rendered in shades of pure red on black. The
+   content is turned to grey, then multiplied by red, so no green or blue light
+   is emitted whatever the colours used by the card. */
+.nightshell { position: relative; isolation: isolate; background: #000; border-radius: var(--ha-card-border-radius, 12px); overflow: hidden; }
+.nightshell.panel-shell { border-radius: 0; min-height: 100vh; }
+.nightshell::after { content: ""; position: absolute; inset: 0; background: #f00; mix-blend-mode: multiply; pointer-events: none; z-index: 10; }
+.nightinner {
+  filter: grayscale(1) brightness(.85);
+  --ha-card-background: #000; --card-background-color: #000; --primary-background-color: #000;
+  --primary-text-color: #fff; --secondary-text-color: #c4c4c4; --divider-color: rgba(255,255,255,.22);
+  --primary-color: #ddd; --text-primary-color: #000; --ac-chip: rgba(255,255,255,.12);
+  --ha-card-box-shadow: none; --ha-card-border-color: rgba(255,255,255,.2);
+  color: #fff; background: #000;
+}
 `;
 
 /* ----------------------------------------------------------- base class -- */
@@ -510,6 +567,10 @@ class AstroCastView extends HTMLElement {
   }
 
   disconnectedCallback() {
+    if (this._onNightMode) {
+      window.removeEventListener(NIGHT_EVENT, this._onNightMode);
+      this._onNightMode = null;
+    }
     this._unsubscribe();
     this._resizeObserver?.disconnect();
     this._resizeObserver = null;
@@ -683,7 +744,10 @@ class AstroCastView extends HTMLElement {
     }
     const active = keepFocus ? this.shadowRoot.activeElement : null;
     const selection = active && active.tagName === "INPUT" ? [active.selectionStart, active.selectionEnd] : null;
-    this.shadowRoot.innerHTML = `<style>${STYLES}</style>${this._wrap(this._content())}`;
+    const body = this._wrap(this._content());
+    this.shadowRoot.innerHTML = `<style>${STYLES}</style>${
+      this.nightMode ? `<div class="nightshell ${this._isPanel ? "panel-shell" : ""}"><div class="nightinner">${body}</div></div>` : body
+    }`;
     this._bind();
     if (active && active.id) {
       const el = this.shadowRoot.getElementById(active.id);
@@ -696,6 +760,42 @@ class AstroCastView extends HTMLElement {
 
   _wrap(inner) {
     return inner;
+  }
+
+  /** Night-vision setting of the card: "toggle" (button), "on" or "auto". */
+  get nightSetting() {
+    const value = this._config?.night_mode;
+    if (value === true || value === "on") return "on";
+    if (value === "auto") return "auto";
+    return "toggle";
+  }
+
+  get nightMode() {
+    const setting = this.nightSetting;
+    if (setting === "on") return true;
+    if (setting === "auto") {
+      const sunAlt = this._data?.now?.sun_alt;
+      return sunAlt !== undefined && sunAlt !== null && sunAlt < -6;
+    }
+    return storedNightMode();
+  }
+
+  _toggleNightMode() {
+    const next = !storedNightMode();
+    try {
+      window.localStorage.setItem(NIGHT_KEY, next ? "on" : "off");
+    } catch (_e) {
+      nightFallback = next; // storage unavailable: lasts until the next reload
+    }
+    // Every AstroCast card and panel of the page follows.
+    window.dispatchEvent(new CustomEvent(NIGHT_EVENT));
+  }
+
+  connectedCallback() {
+    if (!this._onNightMode) {
+      this._onNightMode = () => this._render();
+      window.addEventListener(NIGHT_EVENT, this._onNightMode);
+    }
   }
 
   _content() {
@@ -730,11 +830,12 @@ class AstroCastView extends HTMLElement {
       </div>`;
     };
     const ds = night.deep_sky;
+    const nb = night.narrowband || {};
     let summary;
     if (!night.has_weather) {
       summary = esc(this.t("no_weather"));
     } else if (ds.window_start) {
-      summary = `<b>${esc(this.t("best_window"))}</b> ${this.fmtTime(ds.window_start)} → ${this.fmtTime(ds.window_end)} (${ds.window_score}/100)`;
+      summary = `<b>${esc(this.t("best_window"))}</b> ${this.fmtTime(ds.window_start)} → ${this.fmtTime(ds.window_end)} · ${fmtHours(ds.window_hours)} (${ds.window_score}/100)`;
       if (ds.limiting) summary += ` · ${esc(this.t("limited_by"))} ${esc(this.t(`factor_${ds.limiting}`))}`;
     } else {
       summary = esc(this.t("no_window"));
@@ -744,7 +845,10 @@ class AstroCastView extends HTMLElement {
     if (ds.tier) summary += ` <span class="badge">${esc(this.t(`tier_${ds.tier}`))}${conf ? ` · ${esc(this.t("confidence"))} ${esc(this.t(conf))}` : ""}</span>`;
     const pl = night.planetary;
     if (pl.window_start) {
-      summary += `<br><b>${esc(this.t("planetary"))}</b> ${this.fmtTime(pl.window_start)} → ${this.fmtTime(pl.window_end)} (${pl.window_score}/100)`;
+      summary += `<br><b>${esc(this.t("planetary"))}</b> ${this.fmtTime(pl.window_start)} → ${this.fmtTime(pl.window_end)} · ${fmtHours(pl.window_hours)} (${pl.window_score}/100)`;
+    }
+    if (nb.window_start && (nb.score ?? 0) >= (ds.score ?? 0) + 15) {
+      summary += `<br><b>${esc(this.t("narrowband"))}</b> ${this.fmtTime(nb.window_start)} → ${this.fmtTime(nb.window_end)} · ${fmtHours(nb.window_hours)} (${nb.window_score}/100) <span class="badge">${esc(this.t("narrowband_hint"))}</span>`;
     }
     const moonWaxing = night.moon_phase_angle < 180;
     const astro = night.astro_dusk
@@ -762,15 +866,22 @@ class AstroCastView extends HTMLElement {
       <div class="header">
         <div class="title">${glyph("galaxy", 22)}<span>${esc(this._config?.title || `AstroCast · ${d.site.name}`)}</span></div>
         <button class="health" id="health" title="${esc(this.t("data_sources"))}"><span class="dot" style="background:${healthColor}"></span>${esc(this.t("updated"))} ${this.fmtTime(d.generated)}</button>
+        ${this.nightSetting === "toggle" ? `<button class="iconbtn nightbtn" id="nightmode" aria-pressed="${this.nightMode}" title="${esc(this.t("night_mode"))}" aria-label="${esc(this.t("night_mode"))}"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C6.5 5 2.7 9.3 1.5 12c1.2 2.7 5 7 10.5 7s9.3-4.3 10.5-7C21.3 9.3 17.5 5 12 5zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z" fill="currentColor"/></svg></button>` : ""}
       </div>
       ${this._showProviders ? this._providers() : ""}
-      <div class="scores">${scoreBox("deep_sky", DEEP_COLOR)}${scoreBox("planetary", PLANET_COLOR)}</div>
+      <div class="scores">${scoreBox("deep_sky", DEEP_COLOR)}${scoreBox("planetary", PLANET_COLOR)}${night.narrowband ? scoreBox("narrowband", NARROW_COLOR) : ""}</div>
       <div class="summary">${summary}</div>
       <div class="facts">
         <span class="fact">${moonIcon(night.moon_illumination / 100, moonWaxing, 18)} ${esc(this.t(`phase_${night.moon_phase}`))} · ${night.moon_illumination} %${moonTimes ? ` (${moonTimes})` : ""}</span>
         <span class="fact">🌌 ${esc(this.t("astro_night"))} ${astro}</span>
         ${night.summary.cloud_cover !== null && night.summary.cloud_cover !== undefined ? `<span class="fact">☁ ${Math.round(night.summary.cloud_cover)} %</span>` : ""}
-        ${night.summary.dew_risk && night.summary.dew_risk !== "low" ? `<span class="fact">💧 ${esc(this.t("dew_risk"))} ${esc(this.t(`dew_${night.summary.dew_risk}`))}</span>` : ""}
+        ${
+          night.summary.dew_onset
+            ? `<span class="fact">💧 ${esc(this.t("dew_at"))} ${this.fmtTime(night.summary.dew_onset)}${d.site.dew_heaters ? ` (${esc(this.t("dew_heaters"))})` : ""}</span>`
+            : night.summary.dew_risk && night.summary.dew_risk !== "low"
+              ? `<span class="fact">💧 ${esc(this.t("dew_risk"))} ${esc(this.t(`dew_${night.summary.dew_risk}`))}</span>`
+              : ""
+        }
       </div>`;
   }
 
@@ -904,6 +1015,22 @@ class AstroCastView extends HTMLElement {
     parts.push(`<polygon points="${area}" fill="${DEEP_COLOR}" fill-opacity=".18"/>`);
     parts.push(`<polyline points="${poly(s.deep_sky, yScore)}" fill="none" stroke="${DEEP_COLOR}" stroke-width="2.4" stroke-linejoin="round"/>`);
     parts.push(`<polyline points="${poly(s.planetary, yScore)}" fill="none" stroke="${PLANET_COLOR}" stroke-width="2" stroke-linejoin="round"/>`);
+    // Narrowband only when it tells something the deep-sky curve does not
+    // (typically under the Moon).
+    const showNarrow =
+      s.narrowband && s.narrowband.some((v, i) => v !== null && s.deep_sky[i] !== null && v - s.deep_sky[i] >= 10);
+    if (showNarrow) {
+      parts.push(`<polyline points="${poly(s.narrowband, yScore)}" fill="none" stroke="${NARROW_COLOR}" stroke-width="2" stroke-dasharray="6 3" stroke-linejoin="round"/>`);
+    }
+    // Dew onset on unprotected optics.
+    const dewOnset = night.summary?.dew_onset;
+    if (dewOnset) {
+      const iDew = (new Date(dewOnset).getTime() - t0) / step;
+      if (iDew >= 0 && iDew <= n - 1) {
+        parts.push(`<line x1="${x(iDew)}" x2="${x(iDew)}" y1="${plotTop - 4}" y2="${plotBottom}" stroke="#4fb3e8" stroke-width="1.5" stroke-dasharray="2 3"/>`);
+        parts.push(`<text x="${Math.min(W - 14, x(iDew) + 3)}" y="${plotBottom - 6}" font-size="12">💧</text>`);
+      }
+    }
 
     // Time axis on whole local hours (every 1, 2 or 3 hours depending on width).
     const fmt = new Intl.DateTimeFormat(this.lang, { hour: "2-digit", minute: "2-digit", timeZone: this.timeZone });
@@ -938,6 +1065,8 @@ class AstroCastView extends HTMLElement {
     const legend = `<div class="legend">
       <span><i style="background:${DEEP_COLOR}"></i>${esc(this.t("deep_sky"))}</span>
       <span><i style="background:${PLANET_COLOR}"></i>${esc(this.t("planetary"))}</span>
+      ${showNarrow ? `<span><i style="background:${NARROW_COLOR}"></i>${esc(this.t("narrowband"))}</span>` : ""}
+      ${dewOnset ? `<span>💧 ${esc(this.t("dew_at"))} ${this.fmtTime(dewOnset)}</span>` : ""}
       <span><i style="background:${DEEP_COLOR};opacity:.35"></i>${esc(this.t("potential"))}</span>
       <span><i style="background:${MOON_COLOR}"></i>${esc(this.t("moon"))}</span>
       <span><i style="background:rgba(15,15,55,.6)"></i>${esc(this.t("dark_window"))}</span>
@@ -966,6 +1095,7 @@ class AstroCastView extends HTMLElement {
     const cells = [
       [this.t("deep_sky"), val(s.deep_sky)],
       [this.t("planetary"), val(s.planetary)],
+      ...(s.narrowband ? [[this.t("narrowband"), val(s.narrowband)]] : []),
       [this.t("clouds"), val(s.cloud, 0, " %")],
     ];
     if (s.clear_probability && s.clear_probability[i] !== null) cells.push([this.t("clear_chance"), val(s.clear_probability, 0, " %")]);
@@ -974,6 +1104,7 @@ class AstroCastView extends HTMLElement {
     if (s.humidity) cells.push([this.t("humidity"), val(s.humidity, 0, " %")]);
     if (s.wind) cells.push([this.t("wind"), val(s.wind, 0, " km/h")]);
     if (s.temperature) cells.push([this.t("temperature"), val(s.temperature, 1, " °C")]);
+    if (s.dew_point) cells.push([this.t("dew_point"), val(s.dew_point, 1, " °C")]);
     cells.push([this.t("moon"), s.moon_alt[i] > 0 ? `${s.moon_alt[i]}°` : "↓"]);
     const tier = night.deep_sky.tier;
     const conf = confidenceKey(night.deep_sky.confidence);
@@ -991,6 +1122,7 @@ class AstroCastView extends HTMLElement {
     d.nights.forEach((n, idx) => {
       const ds = n.deep_sky;
       const pl = n.planetary;
+      const nbp = n.narrowband;
       const isBest = n.date === d.best_night;
       const waxing = n.moon_phase_angle < 180;
       if (!n.has_weather && !horizonShown) {
@@ -1004,7 +1136,8 @@ class AstroCastView extends HTMLElement {
         return `<div class="barline"><div class="track"><div class="fill" style="width:${score}%;background:${faded ? color : RATING_COLORS[rating]};opacity:${faded ? 0.35 : 1}"></div></div><span>${p.score ?? `(${p.potential ?? "—"})`}</span></div>`;
       };
       const meta = [];
-      if (ds.window_start) meta.push(`${esc(this.t("window"))} ${this.fmtTime(ds.window_start)}–${this.fmtTime(ds.window_end)}`);
+      if (ds.window_start) meta.push(`${esc(this.t("window"))} ${this.fmtTime(ds.window_start)}–${this.fmtTime(ds.window_end)} (${fmtHours(ds.window_hours)})`);
+      if (n.summary.dew_onset && n.has_weather) meta.push(`💧 ${this.fmtTime(n.summary.dew_onset)}`);
       // Deterministic cloud amounts are not meaningful at trend range: show the
       // ensemble clear-sky probability instead.
       if (n.summary.cloud_cover !== null && n.summary.cloud_cover !== undefined && n.has_weather && ds.tier !== "trend") meta.push(`☁ ${Math.round(n.summary.cloud_cover)} %`);
@@ -1014,11 +1147,11 @@ class AstroCastView extends HTMLElement {
       rows.push(`<div class="night" data-open-night="${idx}" role="button" tabindex="0">
         <div class="date">${esc(this.fmtDate(n.date, { weekday: "short" }))}<small>${esc(this.fmtDate(n.date, { day: "numeric", month: "short" }))}</small>${isBest ? `<span class="badge star">★</span>` : ""}</div>
         <div title="${n.moon_illumination} %">${moonIcon(n.moon_illumination / 100, waxing, 22)}</div>
-        <div><div class="bars">${bar(ds, DEEP_COLOR)}${n.has_weather ? bar(pl, PLANET_COLOR) : ""}</div>
+        <div><div class="bars">${bar(ds, DEEP_COLOR)}${n.has_weather ? bar(pl, PLANET_COLOR) : ""}${n.has_weather && nbp ? bar(nbp, NARROW_COLOR) : ""}</div>
           <div class="meta">${tier ? `<span class="badge">${esc(this.t(`tier_${tier}`))}</span>` : ""}${meta.map((m) => `<span>${m}</span>`).join("")}</div></div>
       </div>`);
     });
-    return `<div class="legend"><span><i style="background:${DEEP_COLOR}"></i>${esc(this.t("deep_sky"))}</span><span><i style="background:${PLANET_COLOR}"></i>${esc(this.t("planetary"))}</span><span>(…) = ${esc(this.t("potential"))}</span><span><span class="badge star">★</span> ${esc(this.t("best"))}</span></div>${rows.join("")}`;
+    return `<div class="legend"><span><i style="background:${DEEP_COLOR}"></i>${esc(this.t("deep_sky"))}</span><span><i style="background:${PLANET_COLOR}"></i>${esc(this.t("planetary"))}</span><span><i style="background:${NARROW_COLOR}"></i>${esc(this.t("narrowband"))}</span><span>(…) = ${esc(this.t("potential"))}</span><span><span class="badge star">★</span> ${esc(this.t("best"))}</span></div>${rows.join("")}`;
   }
 
   /* ------------------------------------------------------ objects tab -- */
@@ -1266,6 +1399,7 @@ class AstroCastView extends HTMLElement {
       this._showProviders = !this._showProviders;
       this._render();
     });
+    root.getElementById("nightmode")?.addEventListener("click", () => this._toggleNightMode());
     root.querySelectorAll("[data-night]").forEach((el) =>
       el.addEventListener("click", () => {
         this._nightIndex = Number(el.dataset.night);
@@ -1384,6 +1518,7 @@ class AstroCastCard extends AstroCastView {
   }
 
   connectedCallback() {
+    super.connectedCallback();
     if (this._hass) this._subscribe(this._config?.entry_id);
   }
 
@@ -1449,7 +1584,12 @@ class AstroCastPanel extends AstroCastView {
   }
 
   connectedCallback() {
+    super.connectedCallback();
     if (this._hass && this._entryId) this._subscribe(this._entryId);
+  }
+
+  get _isPanel() {
+    return true;
   }
 
   _wrap(inner) {
@@ -1524,6 +1664,8 @@ class AstroCastCardEditor extends HTMLElement {
     if (!this._config) return;
     const sites = this._sites || [];
     const view = this._config.view === "compact" ? "compact" : this._config.default_tab || "tonight";
+    const nightValue = this._config.night_mode;
+    const night = nightValue === true || nightValue === "on" ? "on" : nightValue === "auto" ? "auto" : "toggle";
     this.innerHTML = `<div style="display:grid;gap:12px;padding:4px 0">
       <label style="display:grid;gap:4px">${esc(this.t("editor_site"))}
         <select id="site" style="padding:8px;border-radius:6px">
@@ -1535,11 +1677,27 @@ class AstroCastCardEditor extends HTMLElement {
           ${TABS.map((tab) => `<option value="${tab}" ${view === tab ? "selected" : ""}>${esc(this.t(tab))}</option>`).join("")}
           <option value="compact" ${view === "compact" ? "selected" : ""}>${esc(this.t("editor_compact"))}</option>
         </select></label>
+      <label style="display:grid;gap:4px">${esc(this.t("editor_night"))}
+        <select id="night" style="padding:8px;border-radius:6px">
+          ${[
+            ["toggle", "editor_night_toggle"],
+            ["on", "editor_night_on"],
+            ["auto", "editor_night_auto"],
+          ]
+            .map(([value, key]) => `<option value="${value}" ${night === value ? "selected" : ""}>${esc(this.t(key))}</option>`)
+            .join("")}
+        </select></label>
     </div>`;
     this.querySelector("#site").addEventListener("change", (ev) => {
       const config = { ...this._config };
       if (ev.target.value) config.entry_id = ev.target.value;
       else delete config.entry_id;
+      this._emit(config);
+    });
+    this.querySelector("#night").addEventListener("change", (ev) => {
+      const config = { ...this._config };
+      delete config.night_mode;
+      if (ev.target.value !== "toggle") config.night_mode = ev.target.value;
       this._emit(config);
     });
     this.querySelector("#view").addEventListener("change", (ev) => {
