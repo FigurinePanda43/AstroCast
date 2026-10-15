@@ -57,6 +57,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "comet": "Comet {name} at perihelion",
         "deep_sky_window": "Deep-sky window – {rating} ({score}/100)",
         "planetary_window": "Planetary window – {rating} ({score}/100)",
+        "narrowband_window": "Narrowband window – {rating} ({score}/100)",
         "rating_excellent": "excellent",
         "rating_good": "good",
         "rating_fair": "fair",
@@ -72,6 +73,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "desc_daylight": "Occurs in daylight or twilight: telescope needed.",
         "desc_window": "Clouds {cloud}% · seeing {seeing}″ · Moon {moon}% · confidence {conf}.",
         "desc_limiting": "Main limitation: {factor}.",
+        "desc_session": "Session of {hours} (quality {quality}/100).",
+        "desc_dew": "Dew expected on unprotected optics around {time}.",
+        "desc_narrowband": "Moonlit night: suited to narrowband filters (Hα, OIII, SII).",
         "factor_clouds": "clouds",
         "factor_precipitation": "precipitation",
         "factor_darkness": "twilight",
@@ -80,6 +84,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "factor_seeing": "seeing",
         "factor_wind": "wind",
         "factor_humidity": "humidity",
+        "factor_dew": "dew",
+        "factor_duration": "short window",
         "confidence_high": "high",
         "confidence_medium": "medium",
         "confidence_low": "low",
@@ -126,6 +132,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "comet": "Comète {name} au périhélie",
         "deep_sky_window": "Fenêtre ciel profond – {rating} ({score}/100)",
         "planetary_window": "Fenêtre planétaire – {rating} ({score}/100)",
+        "narrowband_window": "Fenêtre bande étroite – {rating} ({score}/100)",
         "rating_excellent": "excellente",
         "rating_good": "bonne",
         "rating_fair": "moyenne",
@@ -141,6 +148,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "desc_daylight": "Se produit de jour ou au crépuscule : télescope nécessaire.",
         "desc_window": "Nuages {cloud} % · seeing {seeing}″ · Lune {moon} % · confiance {conf}.",
         "desc_limiting": "Principale limitation : {factor}.",
+        "desc_session": "Séance de {hours} (qualité {quality}/100).",
+        "desc_dew": "Rosée attendue sur des optiques non protégées vers {time}.",
+        "desc_narrowband": "Nuit éclairée par la Lune : adaptée aux filtres à bande étroite (Hα, OIII, SII).",
         "factor_clouds": "nuages",
         "factor_precipitation": "précipitations",
         "factor_darkness": "crépuscule",
@@ -149,6 +159,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "factor_seeing": "turbulence (seeing)",
         "factor_wind": "vent",
         "factor_humidity": "humidité",
+        "factor_dew": "rosée",
+        "factor_duration": "fenêtre trop courte",
         "confidence_high": "élevée",
         "confidence_medium": "moyenne",
         "confidence_low": "faible",
@@ -192,6 +204,20 @@ def _time(moment: datetime | None) -> str:
     if moment is None:
         return "—"
     return dt_util.as_local(moment).strftime("%Y-%m-%d %H:%M")
+
+
+def clock(moment: datetime | None) -> str:
+    """Local wall-clock time (HH:MM) of a moment."""
+    if moment is None:
+        return "—"
+    return dt_util.as_local(moment).strftime("%H:%M")
+
+
+def duration_text(hours: float) -> str:
+    """Duration such as "2 h 15"."""
+    minutes = int(round(hours * 60))
+    h, m = divmod(minutes, 60)
+    return f"{h} h {m:02d}" if m else f"{h} h"
 
 
 def event_title(event: AstroEvent, language: str) -> str:

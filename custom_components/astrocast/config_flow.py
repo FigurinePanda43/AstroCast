@@ -31,6 +31,7 @@ import voluptuous as vol
 
 from .const import (
     CONF_BORTLE,
+    CONF_DEW_HEATERS,
     CONF_EQUIPMENT,
     CONF_FAVORITES,
     CONF_HORIZON,
@@ -40,6 +41,7 @@ from .const import (
     CONF_SQM,
     CONF_THRESHOLD,
     DEFAULT_BORTLE,
+    DEFAULT_DEW_HEATERS,
     DEFAULT_EQUIPMENT,
     DEFAULT_MIN_ALTITUDE,
     DEFAULT_SHOW_PANEL,
@@ -113,6 +115,9 @@ def _preferences_schema(options: dict[str, Any]) -> dict[Any, Any]:
         ): NumberSelector(
             NumberSelectorConfig(min=30, max=90, step=5, mode=NumberSelectorMode.SLIDER)
         ),
+        vol.Required(
+            CONF_DEW_HEATERS, default=options.get(CONF_DEW_HEATERS, DEFAULT_DEW_HEATERS)
+        ): BooleanSelector(),
     }
 
 

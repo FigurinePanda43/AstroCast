@@ -57,6 +57,7 @@ class SiteConfig:
     equipment: str = "small_telescope"
     threshold: int = 60
     horizon: tuple[tuple[float, float], ...] = ()
+    dew_heaters: bool = False
 
     @property
     def location(self) -> Location:
@@ -71,12 +72,13 @@ class SiteConfig:
 
 @dataclass(slots=True)
 class NightForecast:
-    """A night: ephemeris, weather and both profile analyses."""
+    """A night: ephemeris, weather and the analysis of every profile."""
 
     ephem: NightEphemeris
     weather: scoring.NightWeather
     deep_sky: scoring.ProfileNight
     planetary: scoring.ProfileNight
+    narrowband: scoring.ProfileNight
     summary: dict[str, Any] = field(default_factory=dict)
     objects: list[ObjectNight] = field(default_factory=list)
     planets: list[ObjectNight] = field(default_factory=list)
@@ -84,11 +86,15 @@ class NightForecast:
     @property
     def has_weather(self) -> bool:
         """Whether a weather forecast covers this night."""
-        return self.deep_sky.score is not None or self.planetary.score is not None
+        return any(self.profile(name).score is not None for name in scoring.PROFILES)
 
     def profile(self, name: str) -> scoring.ProfileNight:
         """Return a profile analysis."""
-        return self.deep_sky if name == scoring.DEEP_SKY else self.planetary
+        if name == scoring.PLANETARY:
+            return self.planetary
+        if name == scoring.NARROWBAND:
+            return self.narrowband
+        return self.deep_sky
 
 
 @dataclass(slots=True)
@@ -107,6 +113,7 @@ class NowConditions:
     confidence: float | None
     clear_probability: float | None
     dew_risk: str | None
+    dew_margin: float | None = None
     moonrise: datetime | None = None
     moonset: datetime | None = None
 
@@ -197,11 +204,17 @@ def _night_summary(ephem: NightEphemeris, weather: scoring.NightWeather) -> dict
     temps = temps[~np.isnan(temps)]
     if temps.size:
         summary["temperature_min"] = round(float(np.min(temps)), 1)
-    spread = weather.get(w.TEMPERATURE)[dark] - weather.get(w.DEW_POINT)[dark]
-    spread = spread[~np.isnan(spread)]
-    if spread.size:
-        smallest = float(np.min(spread))
-        summary["dew_risk"] = "high" if smallest <= 2 else "moderate" if smallest <= 4 else "low"
+    margin = scoring.night_dew_margin(ephem, weather)
+    night = (ephem.sun_alt < 0.0) & weather.has_weather & ~np.isnan(margin)
+    summary["dew_onset"] = None
+    summary["dew_margin_min"] = None
+    if np.any(night):
+        smallest = float(np.min(margin[night]))
+        summary["dew_margin_min"] = round(smallest, 1)
+        summary["dew_risk"] = scoring.dew_risk_level(smallest)
+        onset = scoring.night_dew_onset(ephem, weather)
+        if onset is not None:
+            summary["dew_onset"] = ephem.times[onset]
     return summary
 
 
@@ -285,15 +298,18 @@ class Planner:
 
         for index, ephem in enumerate(ephemerides):
             weather = scoring.sample_weather(timeline, ephem)
+            profiles = {
+                name: scoring.analyse_profile(
+                    ephem, weather, name, sqm, site.threshold, site.dew_heaters
+                )
+                for name in scoring.PROFILES
+            }
             night = NightForecast(
                 ephem=ephem,
                 weather=weather,
-                deep_sky=scoring.analyse_profile(
-                    ephem, weather, scoring.DEEP_SKY, sqm, site.threshold
-                ),
-                planetary=scoring.analyse_profile(
-                    ephem, weather, scoring.PLANETARY, sqm, site.threshold
-                ),
+                deep_sky=profiles[scoring.DEEP_SKY],
+                planetary=profiles[scoring.PLANETARY],
+                narrowband=profiles[scoring.NARROWBAND],
                 summary=_night_summary(ephem, weather),
             )
             nights.append(night)
@@ -307,6 +323,7 @@ class Planner:
                 site.equipment,
                 site.latitude,
                 site.horizon,
+                site.dew_heaters,
             )
             by_id: dict[str, ObjectNight] = {}
             if index < OBJECT_NIGHTS:
@@ -427,6 +444,9 @@ class Planner:
             value = values.get(name)
             return np.array([np.nan if value is None else value])
 
+        margin = scoring.dew_margin(arr(w.TEMPERATURE), arr(w.DEW_POINT), arr(w.CLOUD), arr(w.WIND))
+        dew_margin = None if np.isnan(margin[0]) else round(float(margin[0]), 1)
+
         for profile in scoring.PROFILES:
             if hour is None or values.get(w.CLOUD) is None:
                 scores[profile] = None
@@ -447,12 +467,13 @@ class Planner:
                 ),
                 "wind": scoring.wind_factor(arr(w.WIND), arr(w.GUST), profile),
                 "humidity": scoring.humidity_factor(arr(w.HUMIDITY), arr(w.FOG)),
+                "dew": scoring.dew_factor(margin, self.site.dew_heaters),
             }
-            if profile == scoring.DEEP_SKY:
+            if scoring.MOON_SENSITIVITY[profile] > 0.0:
                 delta = moon_brightening_mag(
                     sqm, snap.moon_phase_angle, 90.0 - snap.moon_alt, snap.moon_alt, 90.0, ext
                 )
-                factors["moon"] = scoring.moon_factor(np.atleast_1d(delta))
+                factors["moon"] = scoring.profile_moon_factor(np.atleast_1d(delta), profile)
             else:
                 factors["moon"] = np.ones(1)
             score = scoring.combine(factors)
@@ -475,5 +496,6 @@ class Planner:
             tier=hour.tier if hour else None,
             confidence=hour.confidence if hour else None,
             clear_probability=hour.clear_probability if hour else None,
-            dew_risk=scoring.dew_risk(values.get(w.TEMPERATURE), values.get(w.DEW_POINT)),
+            dew_risk=scoring.dew_risk_level(dew_margin),
+            dew_margin=dew_margin,
         )

@@ -15,10 +15,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .coordinator import AstroCastConfigEntry, AstroCastCoordinator
-from .engine.planner import Forecast
-from .engine.scoring import DEEP_SKY, PLANETARY, rating
+from .engine.planner import Forecast, NightForecast
+from .engine.scoring import DEEP_SKY, NARROWBAND, PLANETARY, rating
 from .entity import AstroCastEntity
-from .i18n import confidence_label, event_description, event_title, text
+from .i18n import clock, confidence_label, duration_text, event_description, event_title, text
 
 PARALLEL_UPDATES = 0
 
@@ -45,15 +45,24 @@ def _fmt(value: float | None, digits: int = 0) -> str:
 def observing_windows(forecast: Forecast, language: str, threshold: int) -> list[CalendarEvent]:
     """Calendar events for every forecast window above the threshold."""
     events: list[CalendarEvent] = []
+
+    def listed(profile_name: str, night: NightForecast) -> bool:
+        profile = night.profile(profile_name)
+        return not (
+            profile.window_start is None
+            or profile.window_end is None
+            or profile.window_score is None
+            or profile.window_score < threshold
+        )
+
     for night in forecast.nights:
-        for profile_name in (DEEP_SKY, PLANETARY):
+        for profile_name in (DEEP_SKY, PLANETARY, NARROWBAND):
             profile = night.profile(profile_name)
-            if (
-                profile.window_start is None
-                or profile.window_end is None
-                or profile.window_score is None
-                or profile.window_score < threshold
-            ):
+            if not listed(profile_name, night):
+                continue
+            # Narrowband windows are only worth an entry on nights that are not
+            # good enough for broadband deep sky (typically under the Moon).
+            if profile_name == NARROWBAND and listed(DEEP_SKY, night):
                 continue
             summary = text(
                 language,
@@ -71,6 +80,23 @@ def observing_windows(forecast: Forecast, language: str, threshold: int) -> list
                     conf=confidence_label(language, profile.confidence),
                 )
             ]
+            lines.append(
+                text(
+                    language,
+                    "desc_session",
+                    hours=duration_text(profile.window_hours),
+                    quality=profile.window_quality,
+                )
+            )
+            if profile_name == NARROWBAND:
+                lines.append(text(language, "desc_narrowband"))
+            onset = night.summary.get("dew_onset")
+            if (
+                onset is not None
+                and not forecast.site.dew_heaters
+                and profile.window_start <= onset <= profile.window_end
+            ):
+                lines.append(text(language, "desc_dew", time=clock(onset)))
             if profile.limiting:
                 lines.append(
                     text(

@@ -21,13 +21,15 @@
           "bortle": "Qualité du ciel (échelle de Bortle)",
           "equipment": "Instrument principal",
           "min_altitude": "Hauteur minimale utilisable",
-          "threshold": "Seuil de « bonnes conditions »"
+          "threshold": "Seuil de « bonnes conditions »",
+          "dew_heaters": "Mes optiques ont des résistances chauffantes"
         },
         "data_description": {
           "bortle": "Pollution lumineuse du site. En cas de doute, consultez lightpollutionmap.info.",
           "equipment": "Sert à juger quels objets sont assez lumineux pour valoir le détour.",
           "min_altitude": "Les objets plus bas (arbres, bâtiments, brume) sont ignorés.",
-          "threshold": "Score (0-100) au-delà duquel les fenêtres sont ajoutées au calendrier et le capteur « bonnes conditions » s'active."
+          "threshold": "Score (0-100) au-delà duquel les fenêtres sont ajoutées au calendrier et le capteur « bonnes conditions » s'active.",
+          "dew_heaters": "Avec des résistances chauffantes, la rosée ne met plus fin à la séance ; sans elles, les scores considèrent les optiques perdues dès que la rosée se forme."
         }
       },
       "reconfigure": {
@@ -60,13 +62,15 @@
           "threshold": "Seuil de « bonnes conditions »",
           "favorites": "Objets favoris",
           "show_panel": "Afficher AstroCast dans la barre latérale",
-          "horizon": "Profil d'horizon (facultatif)"
+          "horizon": "Profil d'horizon (facultatif)",
+          "dew_heaters": "Mes optiques ont des résistances chauffantes"
         },
         "data_description": {
           "sqm": "Si vous possédez un Sky Quality Meter, sa mesure au zénith remplace la classe de Bortle.",
           "favorites": "Chaque favori dispose d'un capteur indiquant sa prochaine fenêtre d'observation favorable.",
           "show_panel": "Ajoute un tableau de bord AstroCast dans la barre latérale (commun à tous les sites).",
-          "horizon": "Obstacles sous forme de couples azimut:hauteur en degrés, par ex. « 0:15, 90:30, 180:10, 270:25 » (nord = 0, est = 90). Les objets masqués sont ignorés."
+          "horizon": "Obstacles sous forme de couples azimut:hauteur en degrés, par ex. « 0:15, 90:30, 180:10, 270:25 » (nord = 0, est = 90). Les objets masqués sont ignorés.",
+          "dew_heaters": "Avec des résistances chauffantes, la rosée ne met plus fin à la séance ; sans elles, les scores considèrent les optiques perdues dès que la rosée se forme."
         }
       }
     },
@@ -107,11 +111,17 @@
       "planetary_tonight": {
         "name": "Planétaire ce soir"
       },
+      "narrowband_tonight": {
+        "name": "Bande étroite ce soir"
+      },
       "deep_sky_now": {
         "name": "Ciel profond maintenant"
       },
       "planetary_now": {
         "name": "Planétaire maintenant"
+      },
+      "narrowband_now": {
+        "name": "Bande étroite maintenant"
       },
       "best_night": {
         "name": "Meilleure nuit à venir"
@@ -124,6 +134,17 @@
       },
       "transparency": {
         "name": "Transparence (extinction)"
+      },
+      "dew_risk": {
+        "name": "Risque de rosée",
+        "state": {
+          "low": "Faible",
+          "moderate": "Modéré",
+          "high": "Élevé"
+        }
+      },
+      "dew_onset": {
+        "name": "Rosée prévue ce soir"
       },
       "moon_phase": {
         "name": "Phase de la Lune",

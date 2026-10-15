@@ -230,15 +230,16 @@ class NightContext:
         equipment: str,
         latitude: float,
         horizon: tuple[tuple[float, float], ...] = (),
+        dew_heaters: bool = False,
     ) -> NightContext:
         """Pre-compute sky factors for the night."""
         usable = ephem.sun_alt < -12.0
         has_weather = bool(np.any(weather.has_weather[usable])) if np.any(usable) else False
         deep = scoring.sky_factors(
-            ephem, weather, scoring.DEEP_SKY, sqm, assume_clear=not has_weather
+            ephem, weather, scoring.DEEP_SKY, sqm, not has_weather, dew_heaters
         )
         planetary = scoring.sky_factors(
-            ephem, weather, scoring.PLANETARY, sqm, assume_clear=not has_weather
+            ephem, weather, scoring.PLANETARY, sqm, not has_weather, dew_heaters
         )
         ext = weather.get("transparency")
         ext = np.where(np.isnan(ext), scoring.DEFAULT_EXTINCTION, ext)
@@ -274,6 +275,7 @@ class NightContext:
             * f["seeing"]
             * f["wind"]
             * f["humidity"]
+            * f["dew"]
         )
 
     def planetary_base(self) -> np.ndarray:
@@ -286,6 +288,7 @@ class NightContext:
             * f["transparency"]
             * f["wind"]
             * f["humidity"]
+            * f["dew"]
         )
 
 

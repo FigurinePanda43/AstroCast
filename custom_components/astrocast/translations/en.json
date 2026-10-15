@@ -21,13 +21,15 @@
           "bortle": "Sky darkness (Bortle scale)",
           "equipment": "Main equipment",
           "min_altitude": "Lowest usable altitude",
-          "threshold": "\"Good conditions\" threshold"
+          "threshold": "\"Good conditions\" threshold",
+          "dew_heaters": "My optics have dew heaters"
         },
         "data_description": {
           "bortle": "Light pollution at the site. Use lightpollutionmap.info if unsure.",
           "equipment": "Used to judge which objects are bright enough to be worth it.",
           "min_altitude": "Objects lower than this (trees, buildings, haze) are ignored.",
-          "threshold": "Score (0-100) above which windows are added to the calendar and the 'good conditions' sensor turns on."
+          "threshold": "Score (0-100) above which windows are added to the calendar and the 'good conditions' sensor turns on.",
+          "dew_heaters": "With dew heaters, dew no longer ends a session; without them, the scores assume the optics are lost once dew forms."
         }
       },
       "reconfigure": {
@@ -60,13 +62,15 @@
           "threshold": "\"Good conditions\" threshold",
           "favorites": "Favourite objects",
           "show_panel": "Show AstroCast in the sidebar",
-          "horizon": "Horizon profile (optional)"
+          "horizon": "Horizon profile (optional)",
+          "dew_heaters": "My optics have dew heaters"
         },
         "data_description": {
           "sqm": "If you own a Sky Quality Meter, its zenith reading overrides the Bortle class.",
           "favorites": "Each favourite gets a sensor with its next favourable observing window.",
           "show_panel": "Adds an AstroCast dashboard to the sidebar (shared by all sites).",
-          "horizon": "Obstacles as azimuth:altitude pairs in degrees, e.g. \"0:15, 90:30, 180:10, 270:25\" (north = 0, east = 90). Objects behind them are ignored."
+          "horizon": "Obstacles as azimuth:altitude pairs in degrees, e.g. \"0:15, 90:30, 180:10, 270:25\" (north = 0, east = 90). Objects behind them are ignored.",
+          "dew_heaters": "With dew heaters, dew no longer ends a session; without them, the scores assume the optics are lost once dew forms."
         }
       }
     },
@@ -107,11 +111,17 @@
       "planetary_tonight": {
         "name": "Planetary tonight"
       },
+      "narrowband_tonight": {
+        "name": "Narrowband tonight"
+      },
       "deep_sky_now": {
         "name": "Deep sky now"
       },
       "planetary_now": {
         "name": "Planetary now"
+      },
+      "narrowband_now": {
+        "name": "Narrowband now"
       },
       "best_night": {
         "name": "Best upcoming night"
@@ -124,6 +134,17 @@
       },
       "transparency": {
         "name": "Transparency (extinction)"
+      },
+      "dew_risk": {
+        "name": "Dew risk",
+        "state": {
+          "low": "Low",
+          "moderate": "Moderate",
+          "high": "High"
+        }
+      },
+      "dew_onset": {
+        "name": "Dew expected tonight"
       },
       "moon_phase": {
         "name": "Moon phase",
