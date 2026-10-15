@@ -599,6 +599,7 @@ class FavoriteSensor(AstroCastEntity, SensorEntity):
                 else object_id.split(":", 1)[1]
             )
         self._attr_translation_placeholders = {"object": label}
+        self._label = label
         self._update_from_data()
 
     def _update_from_data(self) -> None:
@@ -615,6 +616,7 @@ class FavoriteSensor(AstroCastEntity, SensorEntity):
         tonight = fav.tonight
         attrs: dict[str, Any] = {
             "object_id": self.object_id,
+            "name": self._label,
             "next_window_end": iso(nxt.window_end) if nxt else None,
             "next_window_score": nxt.best_score if nxt else None,
             "next_night": nxt.night.isoformat() if nxt else None,

@@ -1,0 +1,83 @@
+blueprint:
+  name: AstroCast – Astronomical event
+  description: >-
+    Notifies a phone before an event of the AstroCast "Astronomical events"
+    calendar (meteor shower peaks, eclipses, conjunctions, oppositions…). Leave
+    the keywords empty to receive every event, or list words of the titles you
+    want, separated by commas (e.g. "meteor, eclipse").
+
+
+    Prévient un téléphone avant un événement du calendrier « Événements
+    astronomiques » d'AstroCast (maximums d'étoiles filantes, éclipses,
+    conjonctions, oppositions…). Laissez les mots-clés vides pour tout recevoir,
+    ou indiquez des mots des titres séparés par des virgules (par ex.
+    « Maximum, Éclipse »).
+  domain: automation
+  author: AstroCast
+  source_url: https://github.com/FigurinePanda43/AstroCast/blob/main/blueprints/automation/astrocast/astronomical_event.yaml
+  homeassistant:
+    min_version: 2025.1.0
+  input:
+    events_calendar:
+      name: Astronomical events calendar / Calendrier des événements
+      selector:
+        entity:
+          filter:
+            - integration: astrocast
+              domain: calendar
+    lead_time:
+      name: Notify before the event / Prévenir avant l'événement
+      default: "-03:00:00"
+      selector:
+        select:
+          options:
+            - label: 1 h
+              value: "-01:00:00"
+            - label: 3 h
+              value: "-03:00:00"
+            - label: 12 h
+              value: "-12:00:00"
+            - label: 1 day / 1 jour
+              value: "-24:00:00"
+            - label: 2 days / 2 jours
+              value: "-48:00:00"
+    keywords:
+      name: Keywords (optional) / Mots-clés (facultatif)
+      default: ""
+      selector:
+        text:
+    notify_device:
+      name: Phone to notify / Téléphone à prévenir
+      selector:
+        device:
+          filter:
+            - integration: mobile_app
+
+mode: queued
+max_exceeded: silent
+
+triggers:
+  - trigger: calendar
+    event: start
+    entity_id: !input events_calendar
+    offset: !input lead_time
+
+variables:
+  keywords: !input keywords
+
+conditions:
+  - condition: template
+    value_template: >-
+      {% set words = keywords.split(',') | map('trim') | select | map('lower') | list %}
+      {% set title = trigger.calendar_event.summary | lower %}
+      {{ words | length == 0 or words | select('in', title) | list | length > 0 }}
+
+actions:
+  - domain: mobile_app
+    type: notify
+    device_id: !input notify_device
+    title: "🌠 {{ trigger.calendar_event.summary }}"
+    message: >-
+      {{ as_timestamp(trigger.calendar_event.start) | timestamp_custom('%d/%m %H:%M') }}
+
+      {{ trigger.calendar_event.description }}

@@ -47,10 +47,15 @@ automatisations — ainsi qu'un tableau de bord dédié.
   - *Ensemble ECMWF* (51 membres) : probabilité de ciel dégagé et niveau de confiance — 15 jours ;
   - *Aérosols CAMS* : poussières et fumées pour estimer objectivement la transparence — 5 jours ;
   - *MET Norway* : secours automatique si Open-Meteo est indisponible.
-- **Scores explicables** — chaque score est le produit de facteurs physiques ; le plus faible
-  est indiqué comme facteur limitant. Chaque valeur indique sa source, son horizon
-  (`détaillée` / `prévision` / `tendance`) et un niveau de confiance. Les estimations ne sont
-  jamais présentées comme des mesures. → [Méthodologie](docs/methodology.md) (en anglais)
+- **Des scores explicables, adaptés à votre pratique** — *ciel profond*, *planétaire* et
+  *bande étroite* (nébuleuses en émission avec filtres Hα/OIII/SII, utilisables même sous la
+  Lune). Chaque score est le produit de facteurs physiques ; le plus faible est indiqué comme
+  facteur limitant. Une nuit est jugée sur sa meilleure **séance continue** : une éclaircie de
+  deux heures n'est pas une bonne nuit pour les poses longues, et la **rosée** sur des optiques
+  non protégées met fin à la séance (indiquez à AstroCast si vous avez des résistances
+  chauffantes). Chaque valeur indique sa source, son horizon (`détaillée` / `prévision` /
+  `tendance`) et un niveau de confiance. Les estimations ne sont jamais présentées comme des
+  mesures. → [Méthodologie](docs/methodology.md) (en anglais)
 - **Quoi observer** — 635 objets du ciel profond (tous les Messier et Caldwell, NGC/IC
   brillants, nébuleuses nommées, noms français) issus d'OpenNGC, les planètes, la Lune, les
   comètes proches du périhélie et les astéroïdes brillants. Un objet n'est *recommandé* que s'il
@@ -64,7 +69,8 @@ automatisations — ainsi qu'un tableau de bord dédié.
 - **Intégration native** — configuration graphique avec carte, reconfiguration, options,
   plusieurs sites, entités traduites (français/anglais), calendriers pour les notifications,
   actions avec réponse, diagnostics, carte Lovelace et panneau latéral installés automatiquement
-  (aucune ressource à ajouter, aucun YAML).
+  (aucune ressource à ajouter, aucun YAML), avec un **mode vision nocturne rouge** et des
+  **blueprints d'automatisation** prêts à l'emploi.
 - **Robuste et léger** — chaque source a son propre rythme de mise à jour, avec temporisation
   en cas d'erreur, cache persistant et dégradation progressive (les calculs astronomiques
   fonctionnent même sans réseau).
@@ -94,8 +100,9 @@ Python pur, et `numpy`, déjà fourni avec Home Assistant) s'installent automati
 
    <img src="docs/images/config-flow.png" width="420" alt="Ajout d'un site d'observation sur la carte">
 2. **Votre pratique** — qualité du ciel (échelle de Bortle), instrument principal, hauteur
-   minimale utilisable (arbres, bâtiments…) et score à partir duquel les conditions sont jugées
-   *bonnes*.
+   minimale utilisable (arbres, bâtiments…), score à partir duquel les conditions sont jugées
+   *bonnes*, et présence de **résistances chauffantes** sur vos optiques (sans elles, les scores
+   considèrent que la séance s'arrête quand la rosée se forme).
 
 Ajoutez à nouveau l'intégration pour chaque site supplémentaire. **Reconfigurer** permet de
 déplacer ou renommer un site, **Configurer** (options) de changer les préférences, saisir une
@@ -112,6 +119,7 @@ type: custom:astrocast-card
 # entry_id: 0123456789abcdef   # facultatif : un site précis (par défaut le premier)
 # default_tab: nights          # tonight | nights | objects | events | sky
 # view: compact                # en-tête seul (scores, meilleure fenêtre, Lune, crépuscules)
+# night_mode: auto             # on | auto (rouge après le coucher du Soleil) ; par défaut : un bouton
 ```
 
 Onglets : **Cette nuit** (frise avec crépuscules, scores, nuages, Lune et meilleure fenêtre ;
@@ -120,10 +128,17 @@ puis potentiel astronomique), **Objets** (recommandations argumentées, recherch
 **Événements**, **Ciel** (carte du ciel des planètes et meilleures cibles à tout moment de la
 nuit).
 
+**Vision nocturne :** le bouton en forme d'œil rouge, dans l'en-tête, passe la carte et le
+panneau en nuances de rouge pur sur fond noir (aucune lumière verte ni bleue, pour préserver
+votre adaptation à l'obscurité). Le choix est mémorisé sur chaque appareil ; `night_mode: on`
+ou `auto` l'impose depuis la configuration de la carte.
+
 ## Entités principales
 
-Pour chaque site : scores *Ciel profond ce soir*, *Planétaire ce soir*, *maintenant*, *Meilleure
-nuit à venir*, *Couverture nuageuse*, *Seeing* et *Transparence* (désactivés par défaut), *Phase*
+Pour chaque site : scores *Ciel profond ce soir*, *Planétaire ce soir*, *Bande étroite ce soir*
+et leurs équivalents *maintenant*, *Meilleure nuit à venir*, *Couverture nuageuse*, *Risque de
+rosée* (avec la marge des optiques au point de rosée), *Rosée prévue ce soir* (heure
+d'apparition), *Seeing* et *Transparence* (désactivés par défaut), *Phase*
 et *Illumination de la Lune*, *Crépuscule* et *Aube astronomiques*, *Prochain événement*,
 *Meilleure cible ce soir*, *Planètes visibles*, un capteur par favori, l'état des *Sources de
 données* ; les capteurs binaires *Nuit astronomique* (qui bascule à l'instant exact) et *Bonnes
@@ -131,6 +146,21 @@ conditions d'observation* ; les calendriers *Fenêtres d'observation* et *Évén
 astronomiques*. La liste détaillée figure dans le [README anglais](README.md#entities).
 
 ## Automatisations
+
+### Blueprints
+
+Importez une automatisation prête à l'emploi en deux clics (Home Assistant 2025.1 ou plus
+récent) ; choisissez « Français » comme langue du message quand elle est proposée :
+
+| | Blueprint | Rôle |
+| --- | --- | --- |
+| [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFigurinePanda43%2FAstroCast%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fastrocast%2Fobserving_window.yaml) | **Fenêtre d'observation à venir** | Notification de 30 min à 6 h avant une fenêtre du calendrier *Fenêtres d'observation*, avec sa durée, les conditions et l'heure de la rosée |
+| [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFigurinePanda43%2FAstroCast%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fastrocast%2Ftonight_briefing.yaml) | **Bilan de la soirée** | Message quotidien à l'heure choisie (par ex. 17 h) si la nuit atteint un score minimum : score, meilleure fenêtre et durée, principale limitation, rosée |
+| [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFigurinePanda43%2FAstroCast%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fastrocast%2Ffavorite_window.yaml) | **Favori bien placé** | Notification avant la prochaine fenêtre favorable d'un objet favori |
+| [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFigurinePanda43%2FAstroCast%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fastrocast%2Fastronomical_event.yaml) | **Événement astronomique** | Rappel avant les événements du calendrier *Événements astronomiques*, filtrables par mots-clés (par ex. Maximum, Éclipse) |
+| [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFigurinePanda43%2FAstroCast%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fastrocast%2Fdew_heaters.yaml) | **Résistances anti-rosée** | Allume les résistances à partir du risque de rosée choisi (Soleil couché) et les éteint quand le risque redevient faible ou au lever du Soleil |
+
+### À la main
 
 Les calendriers permettent d'être prévenu *avant* une bonne nuit :
 
@@ -175,6 +205,9 @@ services météo ci-dessus. Les diagnostics les arrondissent à ~10 km.
   une estimation grossière fondée sur le courant-jet, et la magnitude des comètes est très
   incertaine : les deux sont signalés comme estimations.
 - La pollution lumineuse provient de votre réglage Bortle (ou SQM) ; pas de carte automatique.
+- La rosée est estimée à partir de la température, du point de rosée, de la nébulosité et du
+  vent prévus (les optiques se refroidissent par rayonnement sous un ciel clair et calme) ;
+  les conditions locales (fond de vallée, herbe, pare-buée) peuvent différer.
 - Le catalogue se concentre sur les ~600 objets du ciel profond les plus intéressants ; les
   étoiles doubles et variables ne sont pas encore couvertes.
 - Le profil d'horizon est une simple ligne brisée de points `azimut:hauteur` (pas encore

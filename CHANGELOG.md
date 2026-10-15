@@ -3,6 +3,32 @@
 All notable changes to AstroCast are documented here. The project follows
 [semantic versioning](https://semver.org/); 0.x releases are beta releases.
 
+## [0.2.0] – 2026-10-15
+
+### Changed
+- **Night scores reward long sessions.** A night is now judged on its best continuous session
+  (mean score × a duration factor: full value at 6 h for deep sky and narrowband, at 3 h for
+  planetary), instead of its best 3-hour block. A short clearing (e.g. 21:00–23:00) no longer
+  rates as a good night, and "short window" is reported as the limiting factor. Scores of
+  nights with short or broken windows are lower than in 0.1.x.
+- **Dew is part of the scores.** From the predicted dew onset on unprotected optics, the rest
+  of the night is heavily penalised. If your optics have dew heaters, enable the new
+  *dew heaters* option (Configure): dew then only costs a little.
+
+### Added
+- **Narrowband profile** for emission nebulae through Hα/OIII/SII filters, much less sensitive
+  to the Moon: *Narrowband tonight* and *Narrowband now* sensors, narrowband score in the card
+  and the nights list, and calendar windows on nights that only suit narrowband imaging.
+- **Dew sensors**: *Dew risk* (now, with the optics margin to the dew point) and *Dew expected
+  tonight* (time of onset). The onset is also shown in the card, the night attributes and the
+  calendar windows.
+- **Red night-vision mode** for the card and the panel: a button in the header (remembered per
+  device), or the `night_mode: on | auto` card option. Everything is drawn in pure red on black.
+- **Automation blueprints**: observing window ahead, tonight's briefing (English/French),
+  favourite object well placed, astronomical event (keyword filter), dew heaters.
+- Window length and quality in the sensor attributes, the card, the calendar descriptions and
+  the `get_forecast` response; the favourite sensors expose the object `name`.
+
 ## [0.1.1] – 2026-10-14
 
 ### Fixed
