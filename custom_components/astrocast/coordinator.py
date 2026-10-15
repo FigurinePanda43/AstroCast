@@ -19,6 +19,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_BORTLE,
+    CONF_DEW_HEATERS,
     CONF_EQUIPMENT,
     CONF_FAVORITES,
     CONF_HORIZON,
@@ -26,6 +27,7 @@ from .const import (
     CONF_SQM,
     CONF_THRESHOLD,
     DEFAULT_BORTLE,
+    DEFAULT_DEW_HEATERS,
     DEFAULT_EQUIPMENT,
     DEFAULT_MIN_ALTITUDE,
     DEFAULT_THRESHOLD,
@@ -173,6 +175,7 @@ def site_config(entry: ConfigEntry) -> SiteConfig:
         equipment=str(options.get(CONF_EQUIPMENT, DEFAULT_EQUIPMENT)),
         threshold=int(options.get(CONF_THRESHOLD, DEFAULT_THRESHOLD)),
         horizon=horizon,
+        dew_heaters=bool(options.get(CONF_DEW_HEATERS, DEFAULT_DEW_HEATERS)),
     )
 
 

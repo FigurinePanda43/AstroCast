@@ -30,7 +30,13 @@ from .const import (
 from .coordinator import AstroCastCoordinator
 from .engine.ephemeris import PLANETS
 from .engine.timeutil import iso
-from .serialize import event_to_dict, now_to_dict, object_name, profile_to_dict
+from .serialize import (
+    event_to_dict,
+    now_to_dict,
+    object_name,
+    profile_to_dict,
+    summary_to_dict,
+)
 
 ENTRY_SCHEMA = vol.Schema({vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string})
 FORECAST_SCHEMA = ENTRY_SCHEMA.extend(
@@ -176,10 +182,11 @@ def async_setup_services(hass: HomeAssistant) -> None:
                     "date": n.ephem.night.isoformat(),
                     "deep_sky": profile_to_dict(n.deep_sky),
                     "planetary": profile_to_dict(n.planetary),
+                    "narrowband": profile_to_dict(n.narrowband),
                     "moon_illumination": round(n.ephem.moon_illumination * 100),
                     "astronomical_dusk": iso(n.ephem.astro_dusk),
                     "astronomical_dawn": iso(n.ephem.astro_dawn),
-                    "summary": n.summary,
+                    "summary": summary_to_dict(n.summary),
                     "top_objects": [object_name(o, language) for o in n.objects[:5]],
                 }
                 for n in forecast.nights[:days]

@@ -48,6 +48,8 @@ async def async_get_config_entry_diagnostics(
                     "date": n.ephem.night.isoformat(),
                     "deep_sky": n.deep_sky.score,
                     "planetary": n.planetary.score,
+                    "narrowband": n.narrowband.score,
+                    "window_hours": n.deep_sky.window_hours,
                     "tier": n.deep_sky.tier,
                 }
                 for n in forecast.nights

@@ -10,6 +10,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.astrocast.const import (
     CONF_BORTLE,
+    CONF_DEW_HEATERS,
     CONF_EQUIPMENT,
     CONF_FAVORITES,
     CONF_HORIZON,
@@ -144,6 +145,23 @@ async def test_options_flow(hass: HomeAssistant, setup_integration) -> None:
     assert entry.options[CONF_FAVORITES] == ["M42", "saturn"]
     assert entry.runtime_data.site.sky_brightness == 21.2
     assert entry.runtime_data.site.equipment == "astrophotography"
+
+
+async def test_options_flow_dew_heaters(hass: HomeAssistant, setup_integration) -> None:
+    entry = setup_integration
+    before = entry.runtime_data.data.tonight.deep_sky.score
+    assert entry.runtime_data.site.dew_heaters is False
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert CONF_DEW_HEATERS in {str(k) for k in result["data_schema"].schema}
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**PREFERENCES, CONF_DEW_HEATERS: True, CONF_SHOW_PANEL: True}
+    )
+    await hass.async_block_till_done()
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_DEW_HEATERS] is True
+    assert entry.runtime_data.site.dew_heaters is True
+    # Dew no longer ends the session.
+    assert entry.runtime_data.data.tonight.deep_sky.score >= before
 
 
 async def test_options_flow_horizon(hass: HomeAssistant, setup_integration) -> None:

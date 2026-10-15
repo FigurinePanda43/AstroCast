@@ -27,12 +27,14 @@ CONF_THRESHOLD: Final = "threshold"
 CONF_FAVORITES: Final = "favorites"
 CONF_SHOW_PANEL: Final = "show_panel"
 CONF_HORIZON: Final = "horizon"
+CONF_DEW_HEATERS: Final = "dew_heaters"
 
 DEFAULT_BORTLE: Final = 4
 DEFAULT_MIN_ALTITUDE: Final = 20
 DEFAULT_EQUIPMENT: Final = "small_telescope"
 DEFAULT_THRESHOLD: Final = 60
 DEFAULT_SHOW_PANEL: Final = True
+DEFAULT_DEW_HEATERS: Final = False
 
 EQUIPMENT_OPTIONS: Final = [
     "naked_eye",

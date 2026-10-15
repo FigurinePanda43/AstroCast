@@ -150,6 +150,8 @@ class GoodConditionsSensor(AstroCastEntity, BinarySensorEntity):
             "threshold": self._threshold,
             "deep_sky": (scores.get("deep_sky") or 0) >= self._threshold,
             "planetary": (scores.get("planetary") or 0) >= self._threshold,
+            "narrowband": (scores.get("narrowband") or 0) >= self._threshold,
             "deep_sky_score": scores.get("deep_sky"),
             "planetary_score": scores.get("planetary"),
+            "narrowband_score": scores.get("narrowband"),
         }

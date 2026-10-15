@@ -181,8 +181,15 @@ def test_factor_curves() -> None:
     assert scoring.rating(80) == "excellent"
     assert scoring.rating(10) == "bad"
     assert scoring.rating(None) is None
-    assert scoring.dew_risk(10, 9) == "high"
-    assert scoring.dew_risk(10, 3) == "low"
+    # Dew: a clear calm sky cools the optics 2 °C below the air.
+    margin = scoring.dew_margin(np.array([10.0]), np.array([7.0]), np.array([0.0]), np.array([0.0]))
+    assert margin[0] == pytest.approx(1.0)
+    assert scoring.dew_risk_level(float(margin[0])) == "moderate"
+    windy = scoring.dew_margin(np.array([10.0]), np.array([7.0]), np.array([0.0]), np.array([30.0]))
+    assert windy[0] == pytest.approx(3.0)
+    assert scoring.dew_risk_level(0.2) == "high"
+    assert scoring.dew_risk_level(5.0) == "low"
+    assert scoring.dew_risk_level(None) is None
 
 
 def _synthetic_weather(ephem, cloud: float, seeing: float = 1.0) -> scoring.NightWeather:

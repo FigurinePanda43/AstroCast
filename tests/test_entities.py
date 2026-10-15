@@ -57,6 +57,33 @@ async def test_other_sensors(hass: HomeAssistant, setup_integration) -> None:
     assert seeing.disabled_by is er.RegistryEntryDisabler.INTEGRATION
 
 
+async def test_narrowband_and_session_attributes(hass: HomeAssistant, setup_integration) -> None:
+    narrow = _state(hass, "narrowband_tonight")
+    assert 0 <= int(narrow.state) <= 100
+    assert narrow.attributes["night"] == "2026-10-13"
+    assert 0 <= int(_state(hass, "narrowband_now").state) <= 100
+    deep = _state(hass, "deep_sky_tonight").attributes
+    assert deep["window_hours"] > 0
+    assert 0 < deep["duration_factor"] <= 1
+    assert deep["window_quality"] >= int(_state(hass, "deep_sky_tonight").state)
+    best = _state(hass, "best_night").attributes
+    assert "narrowband" in best["nights"][0]
+    assert "best_narrowband_date" in best
+
+
+async def test_dew_sensors(hass: HomeAssistant, setup_integration) -> None:
+    risk = _state(hass, "dew_risk")
+    assert risk.state in ("low", "moderate", "high")
+    assert risk.attributes["optics_margin"] is not None
+    assert risk.attributes["dew_heaters"] is False
+    onset = _state(hass, "dew_onset")
+    # The recorded forecast saturates the air late in the evening of the 13th.
+    assert onset.attributes["expected"] is True
+    assert onset.state.startswith("2026-10-13T2")
+    assert risk.attributes["tonight_onset"] == onset.state
+    assert _state(hass, "deep_sky_tonight").attributes["dew_onset"] == onset.state
+
+
 async def test_favorite_sensors(hass: HomeAssistant, setup_integration) -> None:
     m31 = _state(hass, "favorite_M31")
     assert m31.attributes["friendly_name"].endswith("M 31 – Andromeda Galaxy next window")
@@ -127,6 +154,7 @@ async def test_calendars(hass: HomeAssistant, setup_integration) -> None:
     assert windows_events
     assert any("Deep-sky window" in e["summary"] for e in windows_events)
     assert all("/100" in e["summary"] for e in windows_events)
+    assert all("Session of" in e["description"] for e in windows_events)
     astro = response[events_cal.entity_id]["events"]
     titles = [e["summary"] for e in astro]
     assert any("meteor shower" in t for t in titles)

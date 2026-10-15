@@ -5,13 +5,21 @@ physical limitation. A single fatal limitation (overcast, daylight, rain)
 therefore drives the score to zero, and the smallest factor is reported as the
 "limiting factor" so that every score can be explained in plain words.
 
-Two profiles are computed:
+Three profiles are computed:
 
 * ``deep_sky``  — faint extended objects, visual or imaging. Dominated by
   clouds, darkness, moonlight (Krisciunas & Schaefer sky-brightness model) and
   transparency. Seeing and wind matter less.
 * ``planetary`` — Moon, planets, double stars. Dominated by clouds and seeing;
   twilight and moonlight barely matter.
+* ``narrowband`` — emission nebulae imaged through narrowband filters (Hα,
+  OIII, SII). Like deep sky, but a 3–7 nm filter rejects most moonlight and
+  light pollution, so the Moon and nautical twilight weigh much less.
+
+The score of a night rewards long sessions: it is the best mean score over a
+contiguous window multiplied by a duration factor (a 2-hour clearing is not a
+good night for long exposures). Dew on unprotected optics ends a session, so
+from the predicted onset the rest of the night is heavily penalised.
 
 See docs/methodology.md for the rationale and the exact curves.
 """
@@ -21,6 +29,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
+import itertools
 import math
 
 import numpy as np
@@ -31,7 +40,8 @@ from .skyglow import moon_brightening_mag
 
 DEEP_SKY = "deep_sky"
 PLANETARY = "planetary"
-PROFILES = (DEEP_SKY, PLANETARY)
+NARROWBAND = "narrowband"
+PROFILES = (DEEP_SKY, PLANETARY, NARROWBAND)
 
 FACTORS = (
     "clouds",
@@ -42,6 +52,7 @@ FACTORS = (
     "seeing",
     "wind",
     "humidity",
+    "dew",
 )
 
 RATINGS: tuple[tuple[int, str], ...] = (
@@ -52,11 +63,10 @@ RATINGS: tuple[tuple[int, str], ...] = (
     (0, "bad"),
 )
 
-SESSION_HOURS = 3.0
 DEFAULT_SEEING = 1.75  # arcsec, typical mid-latitude site
 DEFAULT_EXTINCTION = 0.25  # mag/airmass when no transparency forecast exists
 
-CLOUD_EXPONENT = {DEEP_SKY: 1.6, PLANETARY: 1.1}
+CLOUD_EXPONENT = {DEEP_SKY: 1.6, PLANETARY: 1.1, NARROWBAND: 1.6}
 SEEING_TABLE = (
     (0.8, 1.0),
     (1.0, 0.93),
@@ -66,15 +76,49 @@ SEEING_TABLE = (
     (3.0, 0.3),
     (4.0, 0.15),
 )
-SEEING_EXPONENT = {DEEP_SKY: 0.35, PLANETARY: 1.0}
+SEEING_EXPONENT = {DEEP_SKY: 0.35, PLANETARY: 1.0, NARROWBAND: 0.35}
 WIND_TABLE = ((12.0, 1.0), (20.0, 0.9), (30.0, 0.7), (40.0, 0.45), (55.0, 0.22), (70.0, 0.1))
-WIND_EXPONENT = {DEEP_SKY: 1.0, PLANETARY: 0.8}
+WIND_EXPONENT = {DEEP_SKY: 1.0, PLANETARY: 0.8, NARROWBAND: 1.0}
 HUMIDITY_TABLE = ((85.0, 1.0), (90.0, 0.93), (95.0, 0.82), (100.0, 0.68))
-TRANSPARENCY_EXPONENT = {DEEP_SKY: 1.0, PLANETARY: 0.4}
+TRANSPARENCY_EXPONENT = {DEEP_SKY: 1.0, PLANETARY: 0.4, NARROWBAND: 0.8}
 DARKNESS_TABLE = {
     DEEP_SKY: ((-18.0, 1.0), (-15.0, 0.55), (-12.0, 0.0)),
     PLANETARY: ((-8.0, 1.0), (-4.0, 0.5), (-1.0, 0.0)),
+    NARROWBAND: ((-15.0, 1.0), (-12.0, 0.6), (-10.0, 0.0)),
 }
+# Exponent applied to the moonlight brightening (Δm). A 3–7 nm filter passes the
+# emission lines but only a small slice of the moonlit sky continuum.
+MOON_SENSITIVITY = {DEEP_SKY: 1.0, PLANETARY: 0.0, NARROWBAND: 0.25}
+# Session length (h) → factor. Long exposures need long windows; planetary
+# imaging and observing are done in shorter runs.
+DURATION_TABLE = {
+    DEEP_SKY: (
+        (0.0, 0.0),
+        (1.0, 0.35),
+        (2.0, 0.6),
+        (3.0, 0.78),
+        (4.0, 0.9),
+        (5.0, 0.97),
+        (6.0, 1.0),
+    ),
+    PLANETARY: ((0.0, 0.0), (0.5, 0.45), (1.0, 0.7), (2.0, 0.92), (3.0, 1.0)),
+    NARROWBAND: (
+        (0.0, 0.0),
+        (1.0, 0.35),
+        (2.0, 0.6),
+        (3.0, 0.78),
+        (4.0, 0.9),
+        (5.0, 0.97),
+        (6.0, 1.0),
+    ),
+}
+# Dew: optics cool below the air by radiation under a clear, calm sky.
+DEW_COOLING = 2.0  # °C under a clear sky without wind
+DEW_CALM_WIND = 15.0  # km/h from which wind prevents radiative cooling
+DEW_ONSET_MARGIN = 0.5  # °C: dew forms on unprotected optics below this margin
+DEW_WET = 0.3  # factor once unprotected optics are wet (rest of the night)
+DEW_TABLE = ((0.5, 0.8), (1.0, 0.9), (2.0, 0.97), (3.0, 1.0))
+DEW_TABLE_HEATED = ((-2.0, 0.85), (0.0, 0.95), (1.0, 1.0))
 
 
 def rating(score: float | None) -> str | None:
@@ -156,6 +200,70 @@ def humidity_factor(rh: np.ndarray, fog: np.ndarray) -> np.ndarray:
     f = np.nan_to_num(np.asarray(fog, dtype=float), nan=0.0)
     factor = _table(r, HUMIDITY_TABLE)
     return factor * (1.0 - 0.8 * np.clip(f / 50.0, 0.0, 1.0))
+
+
+def profile_moon_factor(delta_mag: np.ndarray, profile: str) -> np.ndarray:
+    """Moonlight factor of a profile (neutral for planetary observing)."""
+    sensitivity = MOON_SENSITIVITY[profile]
+    if sensitivity <= 0.0:
+        return np.ones(np.shape(delta_mag))
+    return moon_factor(delta_mag, sensitivity)
+
+
+def dew_margin(
+    temperature: np.ndarray, dew_point: np.ndarray, cloud: np.ndarray, wind: np.ndarray
+) -> np.ndarray:
+    """Margin (°C) between the optics' temperature and the dew point.
+
+    Optics exposed to a clear, calm sky cool about 2 °C below the air by
+    radiation; clouds and wind reduce that cooling. NaN where unknown.
+    """
+    t = np.asarray(temperature, dtype=float)
+    td = np.asarray(dew_point, dtype=float)
+    clear = 1.0 - np.clip(np.nan_to_num(np.asarray(cloud, dtype=float), nan=50.0), 0, 100) / 100
+    calm = np.clip(
+        1.0 - np.nan_to_num(np.asarray(wind, dtype=float), nan=0.0) / DEW_CALM_WIND, 0, 1
+    )
+    return (t - td) - DEW_COOLING * clear * calm
+
+
+def dew_onset_index(margin: np.ndarray, active: np.ndarray) -> int | None:
+    """First sample (within ``active``) where dew forms on unprotected optics."""
+    hits = np.flatnonzero(active & ~np.isnan(margin) & (margin <= DEW_ONSET_MARGIN))
+    return int(hits[0]) if hits.size else None
+
+
+def dew_factor(margin: np.ndarray, heaters: bool, onset: int | None = None) -> np.ndarray:
+    """Dew factor from the optics margin.
+
+    Without heaters, optics stay wet once dew has formed: every sample from
+    ``onset`` on gets :data:`DEW_WET`. Heaters keep the optics clear, only
+    saturated air (haze) still costs a little.
+    """
+    m = np.asarray(margin, dtype=float)
+    if heaters:
+        return np.where(np.isnan(m), 1.0, _table(m, DEW_TABLE_HEATED))
+    factor = np.where(np.isnan(m), 1.0, _table(m, DEW_TABLE))
+    factor = np.where(~np.isnan(m) & (m <= DEW_ONSET_MARGIN), DEW_WET, factor)
+    if onset is not None:
+        factor[onset:] = DEW_WET
+    return factor
+
+
+def dew_risk_level(margin: float | None) -> str | None:
+    """Dew risk on unprotected optics: low, moderate or high."""
+    if margin is None or math.isnan(margin):
+        return None
+    if margin <= DEW_ONSET_MARGIN:
+        return "high"
+    if margin <= 2.0:
+        return "moderate"
+    return "low"
+
+
+def duration_factor(hours: float, profile: str) -> float:
+    """Value of a session of ``hours`` hours for a profile (0–1)."""
+    return float(_table(np.array([hours]), DURATION_TABLE[profile])[0])
 
 
 @dataclass(slots=True)
@@ -256,12 +364,29 @@ def zenith_moon_brightening(
     )
 
 
+def night_dew_margin(ephem: NightEphemeris, weather: NightWeather) -> np.ndarray:
+    """Optics dew margin (°C) on the night grid."""
+    return dew_margin(
+        weather.get(w.TEMPERATURE),
+        weather.get(w.DEW_POINT),
+        weather.get(w.CLOUD),
+        weather.get(w.WIND),
+    )
+
+
+def night_dew_onset(ephem: NightEphemeris, weather: NightWeather) -> int | None:
+    """Sample at which dew forms on unprotected optics after sunset, if any."""
+    active = (ephem.sun_alt < 0.0) & weather.has_weather
+    return dew_onset_index(night_dew_margin(ephem, weather), active)
+
+
 def sky_factors(
     ephem: NightEphemeris,
     weather: NightWeather,
     profile: str,
     sqm: float,
     assume_clear: bool = False,
+    dew_heaters: bool = False,
 ) -> dict[str, np.ndarray]:
     """All factors for a profile on the night grid.
 
@@ -273,8 +398,10 @@ def sky_factors(
     extinction = weather.get(w.TRANSPARENCY)
     extinction = np.where(np.isnan(extinction), DEFAULT_EXTINCTION, extinction)
     factors: dict[str, np.ndarray] = {"darkness": darkness_factor(ephem.sun_alt, profile)}
-    if profile == DEEP_SKY:
-        factors["moon"] = moon_factor(zenith_moon_brightening(ephem, sqm, extinction))
+    if MOON_SENSITIVITY[profile] > 0.0:
+        factors["moon"] = profile_moon_factor(
+            zenith_moon_brightening(ephem, sqm, extinction), profile
+        )
     else:
         factors["moon"] = ones.copy()
     if assume_clear:
@@ -284,6 +411,7 @@ def sky_factors(
         factors["seeing"] = seeing_factor(np.full(n, DEFAULT_SEEING), profile)
         factors["wind"] = ones.copy()
         factors["humidity"] = ones.copy()
+        factors["dew"] = ones.copy()
         return factors
 
     cloud = cloud_factor(np.nan_to_num(weather.get(w.CLOUD), nan=100.0), profile)
@@ -299,6 +427,9 @@ def sky_factors(
     factors["seeing"] = seeing_factor(np.where(np.isnan(seeing), DEFAULT_SEEING, seeing), profile)
     factors["wind"] = wind_factor(weather.get(w.WIND), weather.get(w.GUST), profile)
     factors["humidity"] = humidity_factor(weather.get(w.HUMIDITY), weather.get(w.FOG))
+    margin = night_dew_margin(ephem, weather)
+    onset = None if dew_heaters else night_dew_onset(ephem, weather)
+    factors["dew"] = dew_factor(margin, dew_heaters, onset)
     return factors
 
 
@@ -334,6 +465,9 @@ class ProfileNight:
     window_start: datetime | None = None
     window_end: datetime | None = None
     window_score: int | None = None
+    window_quality: int | None = None
+    window_hours: float = 0.0
+    duration_factor: float | None = None
     peak_time: datetime | None = None
     peak_score: int | None = None
     good_hours: float = 0.0
@@ -349,22 +483,85 @@ class ProfileNight:
         return rating(self.score)
 
 
-def _best_block(
-    scores: np.ndarray, usable: np.ndarray, length: int
-) -> tuple[int, int, float] | None:
-    """Best contiguous block of ``length`` samples within the usable mask."""
-    idx = np.flatnonzero(usable)
-    if idx.size == 0:
+@dataclass(slots=True, frozen=True)
+class Session:
+    """Best contiguous observing session of a night."""
+
+    start: int
+    end: int  # exclusive
+    quality: float  # mean score over the session
+    duration: float  # factor for the session length
+    value: float  # quality × duration
+
+
+SESSION_FLOOR = 0.5  # fraction of the night's best level a session sample must reach
+SESSION_MIN_FLOOR = 20.0
+SESSION_MAX_GAP = 2  # samples (30 min)
+
+
+def _decent_samples(scores: np.ndarray, usable: np.ndarray) -> np.ndarray:
+    """Usable samples good enough to belong to a session (short dips bridged)."""
+    level = float(np.percentile(scores[usable], 90))
+    floor = max(SESSION_MIN_FLOOR, SESSION_FLOOR * level)
+    decent = usable & (scores >= floor)
+    if not np.any(decent):
+        return usable  # a uniformly bad night: its (low) mean is the answer
+    idx = np.flatnonzero(decent)
+    for a, b in itertools.pairwise(idx):
+        if 1 < b - a <= SESSION_MAX_GAP + 1 and np.all(usable[a:b]):
+            decent[a:b] = True
+    return decent
+
+
+def best_session(
+    scores: np.ndarray,
+    usable: np.ndarray,
+    profile: str,
+    step_hours: float,
+    reference_hours: float | None = None,
+) -> Session | None:
+    """Window maximising mean score × duration factor within ``usable``.
+
+    A session only spans decent samples (at least half the night's best level),
+    so it cannot buy duration with clouded or dewed-up hours; dips of up to
+    :data:`SESSION_MAX_GAP` samples (a passing cloud) are tolerated.
+
+    ``reference_hours`` normalises the duration factor when only part of the
+    night can be known (end of the forecast range): a window covering all the
+    known hours is then not penalised for the unknown remainder.
+    """
+    n = len(scores)
+    if n == 0 or not np.any(usable):
         return None
-    length = max(1, min(length, idx.size))
-    best: tuple[int, int, float] | None = None
+    usable = _decent_samples(scores, usable)
     values = np.where(usable, scores, 0.0)
     csum = np.concatenate(([0.0], np.cumsum(values)))
-    for start in range(int(idx[0]), int(idx[-1]) - length + 2):
-        mean = (csum[start + length] - csum[start]) / length
-        if best is None or mean > best[2] + 1e-9:
-            best = (start, start + length, mean)
-    return best
+    ucount = np.concatenate(([0], np.cumsum(usable.astype(int))))
+    starts = np.arange(n)[:, None]
+    ends = np.arange(1, n + 1)[None, :]
+    length = ends - starts
+    valid = (length > 0) & ((ucount[ends] - ucount[starts]) == length)
+    if not np.any(valid):
+        return None
+    safe = np.where(valid, length, 1)
+    mean = (csum[ends] - csum[starts]) / safe
+    hours = length * step_hours
+    table = DURATION_TABLE[profile]
+    duration = np.interp(hours, [p[0] for p in table], [p[1] for p in table])
+    if reference_hours is not None and reference_hours > 0:
+        full = duration_factor(reference_hours, profile)
+        if full > 0:
+            duration = np.minimum(1.0, duration / full)
+    value = np.where(valid, mean * duration, -1.0)
+    flat = int(np.argmax(value))
+    i, j = divmod(flat, n)
+    return Session(
+        start=i,
+        end=j + 1,
+        quality=float(mean[i, j]),
+        duration=float(duration[i, j]),
+        value=float(value[i, j]),
+    )
 
 
 def analyse_profile(
@@ -373,48 +570,50 @@ def analyse_profile(
     profile: str,
     sqm: float,
     good_threshold: float = 55.0,
+    dew_heaters: bool = False,
 ) -> ProfileNight:
     """Score a night for a profile: best session, window, limiting factor."""
-    factors = sky_factors(ephem, weather, profile, sqm)
+    factors = sky_factors(ephem, weather, profile, sqm, dew_heaters=dew_heaters)
     scores = combine(factors)
     potential_scores = combine(sky_factors(ephem, weather, profile, sqm, assume_clear=True))
     usable = factors["darkness"] > 0.3
     step_h = STEP_MINUTES / 60.0
     result = ProfileNight(profile, scores, factors, potential_scores)
     result.usable_hours = float(np.count_nonzero(usable)) * step_h
-    block_len = int(round(SESSION_HOURS / step_h))
 
-    pot = _best_block(potential_scores, usable, block_len)
+    pot = best_session(potential_scores, usable, profile, step_h)
     if pot is not None:
-        result.potential = int(round(pot[2]))
+        result.potential = int(round(pot.value))
 
     covered = usable & weather.has_weather
     expected = usable & weather.in_range
     if not np.any(expected) or np.count_nonzero(covered) < 0.5 * np.count_nonzero(expected):
         return result  # outside the weather forecast range: potential only
 
-    block = _best_block(scores, usable, block_len)
-    if block is None:
+    # Hours that cannot be known (beyond the forecast, or the past without
+    # data) must not count as a short window.
+    reference = None
+    if np.count_nonzero(covered) < np.count_nonzero(usable):
+        reference = float(np.count_nonzero(covered)) * step_h
+    session = best_session(np.where(covered, scores, 0.0), covered, profile, step_h, reference)
+    if session is None:
         return result
-    start, end, mean = block
-    result.score = int(round(mean))
+    result.score = int(round(session.value))
     peak = int(np.argmax(np.where(usable, scores, -1.0)))
     result.peak_time = ephem.times[peak]
     result.peak_score = int(round(scores[peak]))
     result.good_hours = float(np.count_nonzero(usable & (scores >= good_threshold))) * step_h
 
-    if mean >= 35.0:
-        threshold = max(35.0, 0.8 * mean)
-        lo, hi = start, end - 1
-        while lo > 0 and usable[lo - 1] and scores[lo - 1] >= threshold:
-            lo -= 1
-        while hi < len(scores) - 1 and usable[hi + 1] and scores[hi + 1] >= threshold:
-            hi += 1
+    focus = np.zeros(len(scores), dtype=bool)
+    if session.quality >= 35.0:
+        lo, hi = session.start, session.end
         result.window_start = ephem.times[lo]
-        result.window_end = ephem.times[hi] + (ephem.times[1] - ephem.times[0])
-        result.window_score = int(round(float(np.mean(scores[lo : hi + 1]))))
-        focus = np.zeros(len(scores), dtype=bool)
-        focus[lo : hi + 1] = True
+        result.window_end = ephem.times[hi - 1] + (ephem.times[1] - ephem.times[0])
+        result.window_score = result.score
+        result.window_quality = int(round(session.quality))
+        result.window_hours = round((hi - lo) * step_h, 2)
+        result.duration_factor = round(session.duration, 3)
+        focus[lo:hi] = True
     else:
         focus = usable
 
@@ -422,6 +621,11 @@ def analyse_profile(
     result.factor_means = {
         name: round(float(np.mean(values[focus & usable])), 3) for name, values in factors.items()
     }
+    if result.duration_factor is not None and result.duration_factor < 0.97:
+        result.factor_means["duration"] = result.duration_factor
+        lowest = min(result.factor_means.values())
+        if result.duration_factor <= lowest:
+            result.limiting = "duration"
     conf = weather.confidence[focus & usable]
     conf = conf[~np.isnan(conf)]
     result.confidence = round(float(np.min(conf)), 2) if conf.size else None
@@ -430,15 +634,3 @@ def analyse_profile(
         order = {"detailed": 0, "forecast": 1, "trend": 2}
         result.tier = max(tiers, key=lambda t: order.get(t, 3))
     return result
-
-
-def dew_risk(temperature: float | None, dew_point: float | None) -> str | None:
-    """Dew/frost risk on optics from the temperature–dew point spread."""
-    if temperature is None or dew_point is None:
-        return None
-    spread = temperature - dew_point
-    if spread <= 2.0:
-        return "high"
-    if spread <= 4.0:
-        return "moderate"
-    return "low"

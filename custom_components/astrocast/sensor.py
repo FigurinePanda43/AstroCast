@@ -40,6 +40,7 @@ MOON_PHASES = [
     "waning_crescent",
 ]
 DATA_HEALTH = ["ok", "degraded", "unavailable"]
+DEW_RISKS = ["low", "moderate", "high"]
 
 PARALLEL_UPDATES = 0
 
@@ -60,6 +61,9 @@ def _profile_attrs(night: NightForecast, profile: ProfileNight, language: str) -
         "window_start": iso(profile.window_start),
         "window_end": iso(profile.window_end),
         "window_score": profile.window_score,
+        "window_quality": profile.window_quality,
+        "window_hours": profile.window_hours,
+        "duration_factor": profile.duration_factor,
         "peak_time": iso(profile.peak_time),
         "good_hours": profile.good_hours,
         "usable_hours": profile.usable_hours,
@@ -72,6 +76,7 @@ def _profile_attrs(night: NightForecast, profile: ProfileNight, language: str) -
         "seeing": night.summary.get("seeing"),
         "transparency": night.summary.get("transparency"),
         "dew_risk": night.summary.get("dew_risk"),
+        "dew_onset": iso(night.summary.get("dew_onset")),
         "moon_illumination": round(ephem.moon_illumination * 100),
         "astronomical_dusk": iso(ephem.astro_dusk),
         "astronomical_dawn": iso(ephem.astro_dawn),
@@ -102,9 +107,12 @@ def _best_night_attrs(coordinator: AstroCastCoordinator, forecast: Forecast) -> 
             "date": n.ephem.night.isoformat(),
             "deep_sky": n.deep_sky.score,
             "planetary": n.planetary.score,
+            "narrowband": n.narrowband.score,
             "rating": n.deep_sky.rating,
             "window_start": iso(n.deep_sky.window_start),
             "window_end": iso(n.deep_sky.window_end),
+            "window_hours": n.deep_sky.window_hours,
+            "dew_onset": iso(n.summary.get("dew_onset")),
             "moon": round(n.ephem.moon_illumination * 100),
             "tier": n.deep_sky.tier,
             "clear_probability": n.summary.get("clear_probability"),
@@ -129,6 +137,10 @@ def _best_night_attrs(coordinator: AstroCastCoordinator, forecast: Forecast) -> 
     if best_pl is not None:
         attrs["best_planetary_date"] = best_pl.ephem.night.isoformat()
         attrs["best_planetary_score"] = best_pl.planetary.score
+    best_nb = forecast.best_night("narrowband")
+    if best_nb is not None:
+        attrs["best_narrowband_date"] = best_nb.ephem.night.isoformat()
+        attrs["best_narrowband_score"] = best_nb.narrowband.score
     return attrs
 
 
@@ -177,6 +189,37 @@ def _transparency_attrs(coordinator: AstroCastCoordinator, forecast: Forecast) -
         "humidity": now.weather.get(w.HUMIDITY),
         "dew_risk": now.dew_risk,
         "estimate": True,
+    }
+
+
+def _dew_attrs(coordinator: AstroCastCoordinator, forecast: Forecast) -> dict[str, Any]:
+    now = forecast.now
+    temperature = now.weather.get(w.TEMPERATURE)
+    dew_point = now.weather.get(w.DEW_POINT)
+    summary = forecast.tonight.summary
+    return {
+        "optics_margin": now.dew_margin,
+        "temperature": temperature,
+        "dew_point": dew_point,
+        "spread": round(temperature - dew_point, 1)
+        if temperature is not None and dew_point is not None
+        else None,
+        "humidity": now.weather.get(w.HUMIDITY),
+        "tonight_risk": summary.get("dew_risk"),
+        "tonight_onset": iso(summary.get("dew_onset")),
+        "dew_heaters": coordinator.site.dew_heaters,
+        "estimate": True,
+    }
+
+
+def _dew_onset_attrs(coordinator: AstroCastCoordinator, forecast: Forecast) -> dict[str, Any]:
+    summary = forecast.tonight.summary
+    return {
+        "expected": summary.get("dew_onset") is not None,
+        "night": forecast.tonight.ephem.night.isoformat(),
+        "risk": summary.get("dew_risk"),
+        "lowest_optics_margin": summary.get("dew_margin_min"),
+        "dew_heaters": coordinator.site.dew_heaters,
     }
 
 
@@ -324,6 +367,16 @@ SENSORS: tuple[AstroCastSensorDescription, ...] = (
         ),
     ),
     AstroCastSensorDescription(
+        key="narrowband_tonight",
+        translation_key="narrowband_tonight",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda c, f: f.tonight.narrowband.score,
+        attrs_fn=lambda c, f: _profile_attrs(
+            f.tonight, f.tonight.narrowband, c.hass.config.language
+        ),
+    ),
+    AstroCastSensorDescription(
         key="deep_sky_now",
         translation_key="deep_sky_now",
         native_unit_of_measurement=PERCENTAGE,
@@ -338,6 +391,14 @@ SENSORS: tuple[AstroCastSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda c, f: f.now.scores.get("planetary"),
         attrs_fn=_now_attrs("planetary"),
+    ),
+    AstroCastSensorDescription(
+        key="narrowband_now",
+        translation_key="narrowband_now",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda c, f: f.now.scores.get("narrowband"),
+        attrs_fn=_now_attrs("narrowband"),
     ),
     AstroCastSensorDescription(
         key="best_night",
@@ -374,6 +435,21 @@ SENSORS: tuple[AstroCastSensorDescription, ...] = (
         entity_registry_enabled_default=False,
         value_fn=_weather_now(w.TRANSPARENCY, 2),
         attrs_fn=_transparency_attrs,
+    ),
+    AstroCastSensorDescription(
+        key="dew_risk",
+        translation_key="dew_risk",
+        device_class=SensorDeviceClass.ENUM,
+        options=DEW_RISKS,
+        value_fn=lambda c, f: f.now.dew_risk,
+        attrs_fn=_dew_attrs,
+    ),
+    AstroCastSensorDescription(
+        key="dew_onset",
+        translation_key="dew_onset",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda c, f: f.tonight.summary.get("dew_onset"),
+        attrs_fn=_dew_onset_attrs,
     ),
     AstroCastSensorDescription(
         key="moon_phase",

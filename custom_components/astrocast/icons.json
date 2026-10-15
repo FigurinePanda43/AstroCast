@@ -7,11 +7,17 @@
       "planetary_tonight": {
         "default": "mdi:orbit"
       },
+      "narrowband_tonight": {
+        "default": "mdi:filter-variant"
+      },
       "deep_sky_now": {
         "default": "mdi:star-four-points"
       },
       "planetary_now": {
         "default": "mdi:earth"
+      },
+      "narrowband_now": {
+        "default": "mdi:filter-outline"
       },
       "best_night": {
         "default": "mdi:calendar-star"
@@ -24,6 +30,17 @@
       },
       "transparency": {
         "default": "mdi:eye-outline"
+      },
+      "dew_risk": {
+        "default": "mdi:water-outline",
+        "state": {
+          "low": "mdi:water-off-outline",
+          "moderate": "mdi:water-outline",
+          "high": "mdi:water-alert"
+        }
+      },
+      "dew_onset": {
+        "default": "mdi:weather-fog"
       },
       "moon_phase": {
         "default": "mdi:moon-waxing-crescent",

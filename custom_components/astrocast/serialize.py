@@ -58,6 +58,9 @@ def profile_to_dict(profile: ProfileNight) -> dict[str, Any]:
         "window_start": iso(profile.window_start),
         "window_end": iso(profile.window_end),
         "window_score": profile.window_score,
+        "window_quality": profile.window_quality,
+        "window_hours": profile.window_hours,
+        "duration_factor": profile.duration_factor,
         "peak_time": iso(profile.peak_time),
         "peak_score": profile.peak_score,
         "good_hours": profile.good_hours,
@@ -67,6 +70,11 @@ def profile_to_dict(profile: ProfileNight) -> dict[str, Any]:
         "tier": profile.tier,
         "factors": profile.factor_means,
     }
+
+
+def summary_to_dict(summary: dict[str, Any]) -> dict[str, Any]:
+    """Night summary with datetimes as ISO strings."""
+    return {k: (iso(v) if isinstance(v, datetime) else v) for k, v in summary.items()}
 
 
 def object_name(obj: ObjectNight, language: str, catalog: Catalog | None = None) -> str:
@@ -159,6 +167,7 @@ def _samples(night: NightForecast, span: tuple[int, int], step: int, full: bool)
         # Unknown (not zero) where no weather forecast covers the sample.
         "deep_sky": _array(np.where(weather.has_weather, night.deep_sky.scores, np.nan)[sl], 0),
         "planetary": _array(np.where(weather.has_weather, night.planetary.scores, np.nan)[sl], 0),
+        "narrowband": _array(np.where(weather.has_weather, night.narrowband.scores, np.nan)[sl], 0),
         "cloud": _array(weather.get(w.CLOUD)[sl], 0),
         "clear_probability": _array(weather.clear_probability[sl], 0),
     }
@@ -210,7 +219,8 @@ def night_to_dict(
         "has_weather": night.has_weather,
         "deep_sky": profile_to_dict(night.deep_sky),
         "planetary": profile_to_dict(night.planetary),
-        "summary": night.summary,
+        "narrowband": profile_to_dict(night.narrowband),
+        "summary": summary_to_dict(night.summary),
     }
     if (index < CURVE_NIGHTS and night.has_weather) or index < SAMPLE_NIGHTS:
         span = _night_span(ephem)
@@ -305,6 +315,7 @@ def now_to_dict(forecast: Forecast) -> dict[str, Any]:
         "confidence": now.confidence,
         "clear_probability": now.clear_probability,
         "dew_risk": now.dew_risk,
+        "dew_margin": now.dew_margin,
         "planets": {k: [round(v[0], 1), round(v[1], 1)] for k, v in snap.bodies.items()},
     }
 
@@ -322,6 +333,7 @@ def forecast_to_dict(
     site = forecast.site
     best = forecast.best_night()
     best_planetary = forecast.best_night("planetary")
+    best_narrowband = forecast.best_night("narrowband")
     return {
         "version": 1,
         "generated": iso(forecast.generated),
@@ -337,10 +349,14 @@ def forecast_to_dict(
             "equipment": site.equipment,
             "threshold": site.threshold,
             "horizon": [list(point) for point in site.horizon],
+            "dew_heaters": site.dew_heaters,
         },
         "now": now_to_dict(forecast),
         "best_night": best.ephem.night.isoformat() if best else None,
         "best_planetary_night": best_planetary.ephem.night.isoformat() if best_planetary else None,
+        "best_narrowband_night": (
+            best_narrowband.ephem.night.isoformat() if best_narrowband else None
+        ),
         "nights": [
             night_to_dict(n, language, i, fav_set) for i, n in enumerate(forecast.nights[:nights])
         ],
