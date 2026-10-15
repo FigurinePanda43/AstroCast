@@ -4,15 +4,21 @@ from __future__ import annotations
 
 from pathlib import Path
 import shutil
+from types import SimpleNamespace
 from typing import Any
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    config_validation as cv,
+    device_registry as dr,
+    entity_registry as er,
+)
 from homeassistant.helpers.template import Template
 from homeassistant.setup import async_setup_component
 from homeassistant.util.yaml import load_yaml_dict
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry, mock_platform
+import voluptuous as vol
 
 SOURCE = Path(__file__).parent.parent / "blueprints" / "automation" / "astrocast"
 BLUEPRINTS = sorted(p.name for p in SOURCE.glob("*.yaml"))
@@ -23,9 +29,34 @@ def _entity(hass: HomeAssistant, key: str) -> str:
     return next(e.entity_id for e in registry.entities.values() if e.unique_id.endswith(f"_{key}"))
 
 
+# Same schema as homeassistant/components/mobile_app/device_action.py. The real
+# platform imports most of the Companion app stack (PyNaCl, cloud, assist…),
+# which the test environment does not install.
+NOTIFY_ACTION_SCHEMA = cv.DEVICE_ACTION_BASE_SCHEMA.extend(
+    {
+        vol.Required("type"): "notify",
+        vol.Required("message"): cv.template,
+        vol.Optional("title"): cv.template,
+        vol.Optional("data"): cv.template_complex,
+    }
+)
+
+
 @pytest.fixture
 def phone(hass: HomeAssistant) -> str:
-    """A Companion app device to notify."""
+    """A Companion app device to notify (its notify action is recorded)."""
+    sent: list[dict[str, Any]] = []
+
+    async def notify(
+        hass: HomeAssistant, config: dict[str, Any], variables: dict[str, Any], context: Any
+    ) -> None:
+        sent.append({"config": config, "variables": variables})
+
+    mock_platform(
+        hass,
+        "mobile_app.device_action",
+        SimpleNamespace(ACTION_SCHEMA=NOTIFY_ACTION_SCHEMA, async_call_action_from_config=notify),
+    )
     entry = MockConfigEntry(domain="mobile_app", data={"device_name": "Phone"})
     entry.add_to_hass(hass)
     device = dr.async_get(hass).async_get_or_create(
