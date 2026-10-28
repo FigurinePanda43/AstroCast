@@ -28,6 +28,8 @@ CONF_FAVORITES: Final = "favorites"
 CONF_SHOW_PANEL: Final = "show_panel"
 CONF_HORIZON: Final = "horizon"
 CONF_DEW_HEATERS: Final = "dew_heaters"
+CONF_STATION_TEMPERATURE: Final = "station_temperature"
+CONF_STATION_HUMIDITY: Final = "station_humidity"
 
 DEFAULT_BORTLE: Final = 4
 DEFAULT_MIN_ALTITUDE: Final = 20
@@ -46,6 +48,8 @@ EQUIPMENT_OPTIONS: Final = [
 ]
 
 UPDATE_INTERVAL: Final = timedelta(minutes=15)
+# A station measurement older than this is ignored (sensor offline).
+STATION_MAX_AGE: Final = timedelta(minutes=90)
 
 # Provider refresh intervals.
 TTL_7TIMER: Final = timedelta(hours=3)

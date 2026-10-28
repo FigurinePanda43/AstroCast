@@ -63,19 +63,24 @@
           "favorites": "Objets favoris",
           "show_panel": "Afficher AstroCast dans la barre latérale",
           "horizon": "Profil d'horizon (facultatif)",
-          "dew_heaters": "Mes optiques ont des résistances chauffantes"
+          "dew_heaters": "Mes optiques ont des résistances chauffantes",
+          "station_temperature": "Température de votre station météo (facultatif)",
+          "station_humidity": "Humidité de votre station météo (facultatif)"
         },
         "data_description": {
           "sqm": "Si vous possédez un Sky Quality Meter, sa mesure au zénith remplace la classe de Bortle.",
           "favorites": "Chaque favori dispose d'un capteur indiquant sa prochaine fenêtre d'observation favorable.",
           "show_panel": "Ajoute un tableau de bord AstroCast dans la barre latérale (commun à tous les sites).",
           "horizon": "Obstacles sous forme de couples azimut:hauteur en degrés, par ex. « 0:15, 90:30, 180:10, 270:25 » (nord = 0, est = 90). Les objets masqués sont ignorés.",
-          "dew_heaters": "Avec des résistances chauffantes, la rosée ne met plus fin à la séance ; sans elles, les scores considèrent les optiques perdues dès que la rosée se forme."
+          "dew_heaters": "Avec des résistances chauffantes, la rosée ne met plus fin à la séance ; sans elles, les scores considèrent les optiques perdues dès que la rosée se forme.",
+          "station_temperature": "Avec les deux capteurs, les conditions actuelles utilisent vos mesures et la prévision des heures suivantes est corrigée de l'écart constaté (correction qui s'estompe en 6 heures environ). Le risque et l'heure de la rosée deviennent bien plus fiables. Utilisez un capteur à l'air libre, à l'ombre, vers 1,5–2 m de haut.",
+          "station_humidity": "Capteur d'humidité relative placé à côté du capteur de température (les deux sont nécessaires)."
         }
       }
     },
     "error": {
-      "invalid_horizon": "Profil d'horizon invalide : utilisez des couples azimut:hauteur comme « 0:15, 90:30, 180:10 »."
+      "invalid_horizon": "Profil d'horizon invalide : utilisez des couples azimut:hauteur comme « 0:15, 90:30, 180:10 ».",
+      "station_incomplete": "Choisissez à la fois le capteur de température et celui d'humidité de la station, ou aucun des deux."
     }
   },
   "selector": {

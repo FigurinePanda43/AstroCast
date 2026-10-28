@@ -33,6 +33,7 @@ from .objects import (
 )
 from .skyglow import bortle_to_sqm, moon_brightening_mag
 from .smallbodies import OrbitalElements
+from .station import STATION, StationCorrection, StationReading, apply_station
 from .timeutil import night_date_for, utc
 
 _LOGGER = logging.getLogger(__name__)
@@ -114,6 +115,7 @@ class NowConditions:
     clear_probability: float | None
     dew_risk: str | None
     dew_margin: float | None = None
+    station: StationCorrection | None = None
     moonrise: datetime | None = None
     moonset: datetime | None = None
 
@@ -282,6 +284,7 @@ class Planner:
         comets: Sequence[OrbitalElements] = (),
         asteroids: Sequence[OrbitalElements] = (),
         favorites: Iterable[str] = (),
+        station: StationReading | None = None,
     ) -> Forecast:
         """Compute a complete forecast (CPU bound: run in an executor)."""
         now = utc(now)
@@ -289,6 +292,7 @@ class Planner:
         sqm = site.sky_brightness
         if timeline is None:
             timeline = w.Timeline([], {})
+        correction = apply_station(timeline, station, now) if station is not None else None
         ephemerides = self.nights_for(now)
         favorites = list(dict.fromkeys(favorites))
         observer = site.location.observer
@@ -418,15 +422,21 @@ class Planner:
         return Forecast(
             generated=now,
             site=site,
-            now=self._now(now, timeline, sqm),
+            now=self._now(now, timeline, sqm, correction),
             nights=nights,
             events=self.events(now, comets),
             favorites=favorite_results,
             timeline=timeline,
         )
 
-    def _now(self, now: datetime, timeline: w.Timeline, sqm: float) -> NowConditions:
-        """Instantaneous conditions."""
+    def _now(
+        self,
+        now: datetime,
+        timeline: w.Timeline,
+        sqm: float,
+        station: StationCorrection | None = None,
+    ) -> NowConditions:
+        """Instantaneous conditions (measured by the local station when there is one)."""
         snap = snapshot(self.site.location, now)
         hour = timeline.at(now)
         values: dict[str, float | None] = {}
@@ -436,6 +446,13 @@ class Planner:
                 value = timeline.interpolate(name, now.timestamp())
                 values[name] = round(value, 2) if value is not None else None
             sources = dict(hour.sources)
+        if station is not None and station.accepted:
+            reading = station.reading
+            values[w.TEMPERATURE] = round(reading.temperature, 2)
+            values[w.HUMIDITY] = round(reading.humidity, 1)
+            values[w.DEW_POINT] = round(reading.dew_point, 2)
+            for name in (w.TEMPERATURE, w.HUMIDITY, w.DEW_POINT):
+                sources[name] = STATION
         scores: dict[str, int | None] = {}
         factors_out: dict[str, dict[str, float]] = {}
         limiting: dict[str, str | None] = {}
@@ -498,4 +515,5 @@ class Planner:
             clear_probability=hour.clear_probability if hour else None,
             dew_risk=scoring.dew_risk_level(dew_margin),
             dew_margin=dew_margin,
+            station=station,
         )

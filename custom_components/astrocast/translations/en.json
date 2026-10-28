@@ -63,19 +63,24 @@
           "favorites": "Favourite objects",
           "show_panel": "Show AstroCast in the sidebar",
           "horizon": "Horizon profile (optional)",
-          "dew_heaters": "My optics have dew heaters"
+          "dew_heaters": "My optics have dew heaters",
+          "station_temperature": "Temperature of your weather station (optional)",
+          "station_humidity": "Humidity of your weather station (optional)"
         },
         "data_description": {
           "sqm": "If you own a Sky Quality Meter, its zenith reading overrides the Bortle class.",
           "favorites": "Each favourite gets a sensor with its next favourable observing window.",
           "show_panel": "Adds an AstroCast dashboard to the sidebar (shared by all sites).",
           "horizon": "Obstacles as azimuth:altitude pairs in degrees, e.g. \"0:15, 90:30, 180:10, 270:25\" (north = 0, east = 90). Objects behind them are ignored.",
-          "dew_heaters": "With dew heaters, dew no longer ends a session; without them, the scores assume the optics are lost once dew forms."
+          "dew_heaters": "With dew heaters, dew no longer ends a session; without them, the scores assume the optics are lost once dew forms.",
+          "station_temperature": "With both sensors, the current conditions use your measurements and the forecast of the next hours is corrected by the current error (fading out over about 6 hours). This makes the dew risk and dew time much more reliable. Use a sensor in the open air, in the shade, about 1.5–2 m high.",
+          "station_humidity": "Relative humidity sensor next to the temperature sensor (both are needed)."
         }
       }
     },
     "error": {
-      "invalid_horizon": "Invalid horizon profile: use azimuth:altitude pairs such as \"0:15, 90:30, 180:10\"."
+      "invalid_horizon": "Invalid horizon profile: use azimuth:altitude pairs such as \"0:15, 90:30, 180:10\".",
+      "station_incomplete": "Choose both the temperature and the humidity sensors of the station, or none."
     }
   },
   "selector": {

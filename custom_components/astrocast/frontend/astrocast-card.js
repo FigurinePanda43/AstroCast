@@ -6,7 +6,7 @@
  * again every time the forecast is recomputed.
  */
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 /* ------------------------------------------------------------------ i18n -- */
 
@@ -17,6 +17,8 @@ const STRINGS = {
     narrowband: "Narrowband",
     narrowband_hint: "Moonlit night: narrowband filters (Hα, OIII, SII) still work",
     dew_at: "Dew around",
+    station: "station",
+    station_title: "Measured by your weather station",
     dew_heaters: "heaters",
     night_mode: "Night vision (red)",
     editor_night: "Night vision (red)",
@@ -173,6 +175,8 @@ const STRINGS = {
     narrowband: "Bande étroite",
     narrowband_hint: "Nuit éclairée par la Lune : les filtres à bande étroite (Hα, OIII, SII) restent utilisables",
     dew_at: "Rosée vers",
+    station: "station",
+    station_title: "Mesuré par votre station météo",
     dew_heaters: "résistances",
     night_mode: "Vision nocturne (rouge)",
     editor_night: "Vision nocturne (rouge)",
@@ -881,6 +885,11 @@ class AstroCastView extends HTMLElement {
             : night.summary.dew_risk && night.summary.dew_risk !== "low"
               ? `<span class="fact">💧 ${esc(this.t("dew_risk"))} ${esc(this.t(`dew_${night.summary.dew_risk}`))}</span>`
               : ""
+        }
+        ${
+          d.now.station
+            ? `<span class="fact" title="${esc(this.t("station_title"))}">🌡 ${d.now.station.temperature} °C · ${d.now.station.humidity} % · ${esc(this.t("dew_point"))} ${d.now.station.dew_point} °C (${esc(this.t("station"))})</span>`
+            : ""
         }
       </div>`;
   }

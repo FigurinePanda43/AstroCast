@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -16,6 +17,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     BooleanSelector,
+    EntitySelector,
+    EntitySelectorConfig,
     LocationSelector,
     LocationSelectorConfig,
     NumberSelector,
@@ -39,6 +42,8 @@ from .const import (
     CONF_MIN_ALTITUDE,
     CONF_SHOW_PANEL,
     CONF_SQM,
+    CONF_STATION_HUMIDITY,
+    CONF_STATION_TEMPERATURE,
     CONF_THRESHOLD,
     DEFAULT_BORTLE,
     DEFAULT_DEW_HEATERS,
@@ -148,6 +153,12 @@ async def _resolve_elevation(
     if found is not None:
         return round(found)
     return float(hass.config.elevation or 0)
+
+
+STATION_PAIRS = (
+    (CONF_STATION_TEMPERATURE, CONF_STATION_HUMIDITY),
+    (CONF_STATION_HUMIDITY, CONF_STATION_TEMPERATURE),
+)
 
 
 def _normalise_options(user_input: dict[str, Any]) -> dict[str, Any]:
@@ -323,6 +334,11 @@ class AstroCastOptionsFlow(OptionsFlow):
                     data[CONF_HORIZON] = format_horizon(horizon)
                 else:
                     data.pop(CONF_HORIZON, None)
+            # The station needs both sensors (the dew point uses both).
+            for key, other in STATION_PAIRS:
+                if not data.get(key) and data.get(other):
+                    errors[key] = "station_incomplete"
+            if not errors:
                 return self.async_create_entry(data=data)
             options.update(user_input)
         favorites = list(options.get(CONF_FAVORITES, []))
@@ -339,6 +355,14 @@ class AstroCastOptionsFlow(OptionsFlow):
                 )
             )
         )
+        for key, device_class in (
+            (CONF_STATION_TEMPERATURE, SensorDeviceClass.TEMPERATURE),
+            (CONF_STATION_HUMIDITY, SensorDeviceClass.HUMIDITY),
+        ):
+            current = options.get(key)
+            schema[
+                vol.Optional(key, description={"suggested_value": current} if current else None)
+            ] = EntitySelector(EntitySelectorConfig(domain="sensor", device_class=device_class))
         horizon = options.get(CONF_HORIZON)
         schema[
             vol.Optional(

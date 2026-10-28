@@ -208,8 +208,29 @@ def _dew_attrs(coordinator: AstroCastCoordinator, forecast: Forecast) -> dict[st
         "tonight_risk": summary.get("dew_risk"),
         "tonight_onset": iso(summary.get("dew_onset")),
         "dew_heaters": coordinator.site.dew_heaters,
-        "estimate": True,
+        "source": now.sources.get(w.DEW_POINT),
+        **_station_attrs(coordinator, forecast),
+        "estimate": now.sources.get(w.DEW_POINT) != "station",
     }
+
+
+def _station_attrs(coordinator: AstroCastCoordinator, forecast: Forecast) -> dict[str, Any]:
+    status = coordinator.station_status
+    if status is None:
+        return {}
+    attrs: dict[str, Any] = {"station": status["state"]}
+    correction = forecast.now.station
+    if correction is not None:
+        attrs.update(
+            {
+                "station_temperature": round(correction.reading.temperature, 1),
+                "station_humidity": round(correction.reading.humidity, 1),
+                "station_dew_point": round(correction.reading.dew_point, 1),
+                "forecast_error_temperature": correction.temperature_offset,
+                "forecast_error_dew_point": correction.dew_point_offset,
+            }
+        )
+    return attrs
 
 
 def _dew_onset_attrs(coordinator: AstroCastCoordinator, forecast: Forecast) -> dict[str, Any]:

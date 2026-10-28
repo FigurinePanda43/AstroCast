@@ -116,6 +116,15 @@ site and **Configure** (options) to change preferences, set a measured SQM value
 your local horizon (obstacles as `azimuth:altitude` pairs, e.g. `0:15, 90:30, 180:10, 270:25`),
 pick favourite objects, or hide the sidebar panel.
 
+**Local weather station (optional).** In **Configure**, choose the temperature and humidity
+sensors of a weather station connected to Home Assistant. The current conditions then use
+your measurements, and the forecast temperature and dew point of the next hours are corrected
+by the current error (the correction fades out over about 6 hours). Gardens are often 1–3 °C
+cooler and moister at night than the model grid, so the dew risk and the dew time become
+much more reliable. Use a sensor in the open air and in the shade; a station that differs
+from the forecast by more than 8 °C (sun, wall, indoors) or that stops reporting for 90
+minutes is ignored.
+
 ## Dashboard
 
 An **AstroCast** entry appears in the sidebar (can be disabled in the options). The same view
@@ -151,7 +160,7 @@ Per site (`<site>` is the site name):
 | `sensor.<site>_deep_sky_now` / `_planetary_now` / `_narrowband_now` | Current scores with every factor |
 | `sensor.<site>_best_upcoming_night` | Start of the best upcoming window; attributes list every night |
 | `sensor.<site>_cloud_cover` | Current cloud cover (with clear-sky probability) |
-| `sensor.<site>_dew_risk` | Dew risk on unprotected optics now (`low` / `moderate` / `high`), with the optics margin to the dew point |
+| `sensor.<site>_dew_risk` | Dew risk on unprotected optics now (`low` / `moderate` / `high`), with the optics margin to the dew point, and the station measurement and forecast error when a station is configured |
 | `sensor.<site>_dew_expected_tonight` | When dew is expected to form tonight (unknown when none is expected) |
 | `sensor.<site>_seeing` · `_transparency_extinction` | Seeing (″) and V-band extinction (mag/airmass) — *disabled by default* |
 | `sensor.<site>_moon_phase` · `_moon_illumination` | Lunar phase and illuminated fraction |

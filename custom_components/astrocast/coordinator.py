@@ -6,16 +6,25 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from functools import partial
 import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_ELEVATION, CONF_LATITUDE, CONF_LONGITUDE
-from homeassistant.core import HomeAssistant
+from homeassistant.const import (
+    ATTR_UNIT_OF_MEASUREMENT,
+    CONF_ELEVATION,
+    CONF_LATITUDE,
+    CONF_LONGITUDE,
+    UnitOfTemperature,
+)
+from homeassistant.core import HomeAssistant, State
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
+from homeassistant.util.unit_conversion import TemperatureConverter
 
 from .const import (
     CONF_BORTLE,
@@ -25,6 +34,8 @@ from .const import (
     CONF_HORIZON,
     CONF_MIN_ALTITUDE,
     CONF_SQM,
+    CONF_STATION_HUMIDITY,
+    CONF_STATION_TEMPERATURE,
     CONF_THRESHOLD,
     DEFAULT_BORTLE,
     DEFAULT_DEW_HEATERS,
@@ -33,6 +44,7 @@ from .const import (
     DEFAULT_THRESHOLD,
     DOMAIN,
     MAX_AGE,
+    STATION_MAX_AGE,
     STORAGE_VERSION,
     TTL_7TIMER,
     TTL_AIR_QUALITY,
@@ -47,6 +59,7 @@ from .engine.catalog import Catalog, load_catalog
 from .engine.horizon import HorizonError, parse_horizon
 from .engine.planner import Forecast, Planner, SiteConfig
 from .engine.smallbodies import OrbitalElements
+from .engine.station import StationReading
 from .engine.timeutil import night_date_for, night_window
 from .engine.weather import WeatherSeries, build_timeline
 from .providers import jpl, metno, open_meteo, seventimer
@@ -155,6 +168,11 @@ class AstroCastShared:
             return self.comets, self.asteroids
 
 
+def _reported(state: State) -> datetime:
+    """When a state was last written by its integration (even if unchanged)."""
+    return getattr(state, "last_reported", None) or state.last_updated
+
+
 def site_config(entry: ConfigEntry) -> SiteConfig:
     """Build the engine configuration from a config entry."""
     options = entry.options
@@ -208,6 +226,7 @@ class AstroCastCoordinator(DataUpdateCoordinator[Forecast]):
         self.options_snapshot: dict[str, Any] = dict(entry.options)
         self.add_sensor_entities: Callable[[list[Any]], None] | None = None
         self._restored = False
+        self.station_status: dict[str, Any] | None = None
         self._compute_lock = asyncio.Lock()
 
     @property
@@ -318,14 +337,68 @@ class AstroCastCoordinator(DataUpdateCoordinator[Forecast]):
         comets, asteroids = await self.shared.async_small_bodies(now)
         night_start = night_window(night_date_for(now, self.site.longitude), self.site.longitude)[0]
         timeline = build_timeline(self.series, now, self.site.elevation, start=night_start)
+        station = self.station_reading(now)
         async with self._compute_lock:
             try:
-                return await self.hass.async_add_executor_job(
-                    self.planner.compute, now, timeline, comets, asteroids, self.favorites
+                forecast = await self.hass.async_add_executor_job(
+                    partial(
+                        self.planner.compute,
+                        now,
+                        timeline,
+                        comets,
+                        asteroids,
+                        self.favorites,
+                        station=station,
+                    )
                 )
             except Exception as err:
                 _LOGGER.exception("AstroCast computation failed")
                 raise UpdateFailed(f"Computation failed: {err}") from err
+        correction = forecast.now.station
+        if self.station_status is not None and correction is not None and not correction.accepted:
+            self.station_status["state"] = "rejected"
+            _LOGGER.debug(
+                "Ignoring the local station: it differs from the forecast by %s / %s °C",
+                correction.temperature_offset,
+                correction.dew_point_offset,
+            )
+        return forecast
+
+    def station_reading(self, now: datetime) -> StationReading | None:
+        """Latest valid temperature and humidity of the local station, if configured."""
+        options = self.config_entry.options
+        temperature_id = options.get(CONF_STATION_TEMPERATURE)
+        humidity_id = options.get(CONF_STATION_HUMIDITY)
+        if not temperature_id or not humidity_id:
+            self.station_status = None
+            return None
+        status: dict[str, Any] = {
+            "temperature_entity": temperature_id,
+            "humidity_entity": humidity_id,
+            "state": "ok",
+        }
+        self.station_status = status
+        t_state = self.hass.states.get(temperature_id)
+        h_state = self.hass.states.get(humidity_id)
+        try:
+            if t_state is None or h_state is None:
+                raise ValueError("missing entity")
+            unit = t_state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) or UnitOfTemperature.CELSIUS
+            temperature = TemperatureConverter.convert(
+                float(t_state.state), unit, UnitOfTemperature.CELSIUS
+            )
+            humidity = float(h_state.state)
+        except (ValueError, TypeError, HomeAssistantError):
+            status["state"] = "unavailable"
+            return None
+        if not (-60.0 < temperature < 60.0 and 0.0 < humidity <= 100.0):
+            status["state"] = "invalid"
+            return None
+        reported = min(_reported(t_state), _reported(h_state))
+        if now - reported > STATION_MAX_AGE:
+            status["state"] = "stale"
+            return None
+        return StationReading(reported, temperature, humidity)
 
     def provider_report(self) -> dict[str, Any]:
         """Health of every data source."""

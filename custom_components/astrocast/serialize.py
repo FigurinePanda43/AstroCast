@@ -316,6 +316,18 @@ def now_to_dict(forecast: Forecast) -> dict[str, Any]:
         "clear_probability": now.clear_probability,
         "dew_risk": now.dew_risk,
         "dew_margin": now.dew_margin,
+        "station": (
+            {
+                "temperature": round(now.station.reading.temperature, 1),
+                "humidity": round(now.station.reading.humidity),
+                "dew_point": round(now.station.reading.dew_point, 1),
+                "time": iso(now.station.reading.time),
+                "temperature_error": now.station.temperature_offset,
+                "dew_point_error": now.station.dew_point_offset,
+            }
+            if now.station is not None and now.station.accepted
+            else None
+        ),
         "planets": {k: [round(v[0], 1), round(v[1], 1)] for k, v in snap.bodies.items()},
     }
 

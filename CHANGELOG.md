@@ -3,6 +3,17 @@
 All notable changes to AstroCast are documented here. The project follows
 [semantic versioning](https://semver.org/); 0.x releases are beta releases.
 
+## [0.3.0] – 2026-10-28
+
+### Added
+- **Local weather station.** Optional temperature and humidity sensors (options): the current
+  conditions and the dew risk use your measurements, and the forecast temperature and dew
+  point of the next hours are corrected by the current error, fading out over about 6 hours.
+  The dew onset and the dew penalty of tonight's scores follow your garden rather than the
+  model grid. Fahrenheit and kelvin sensors are converted; a sensor more than 8 °C away from
+  the forecast or silent for 90 minutes is ignored. The dew risk sensor, the card and the
+  diagnostics show the measurement and the forecast error.
+
 ## [0.2.0] – 2026-10-15
 
 ### Changed

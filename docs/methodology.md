@@ -97,6 +97,16 @@ heaters* option, there is no onset: the factor only drops to 0.95 at a zero marg
 at −2 °C (saturated, hazy air). The night summary gives the expected onset time and the
 lowest margin; the dew risk sensor gives the current level (high ≤ 0.5 °C, moderate ≤ 2 °C).
 
+**Local weather station.** When temperature and humidity sensors are configured, the dew
+point is computed with the Magnus formula (Alduchov & Eskridge 1996). The current conditions
+use the measurement. The current error of the forecast (measurement − forecast, for the
+temperature and the dew point) is added to every hour from now on with a weight
+exp(−Δt / 6 h), and the relative humidity is recomputed from the corrected values: local
+effects (cold air pooling in a garden or a valley, a nearby lawn) persist for a few hours,
+then the model takes over again. The past is never rewritten. A measurement differing from
+the forecast by more than 8 °C is treated as a misplaced or faulty sensor and ignored, as is
+a sensor that has not reported for 90 minutes.
+
 **Moonlight.** The sky brightening Δm (mag/arcsec²) caused by the Moon is computed with the
 Krisciunas & Schaefer (1991) model from the lunar phase angle, the Moon–target separation, both
 zenith distances and the extinction coefficient, relative to the natural sky brightness of the

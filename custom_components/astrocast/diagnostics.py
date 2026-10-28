@@ -7,8 +7,29 @@ from typing import Any
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE
 from homeassistant.core import HomeAssistant
 
-from .coordinator import AstroCastConfigEntry
+from .coordinator import AstroCastConfigEntry, AstroCastCoordinator
 from .engine.timeutil import iso
+
+
+def _station(coordinator: AstroCastCoordinator) -> dict[str, Any] | None:
+    status = coordinator.station_status
+    if status is None:
+        return None
+    result = dict(status)
+    correction = coordinator.data.now.station if coordinator.data else None
+    if correction is not None:
+        result.update(
+            {
+                "reading_time": iso(correction.reading.time),
+                "temperature": round(correction.reading.temperature, 1),
+                "humidity": round(correction.reading.humidity, 1),
+                "dew_point": round(correction.reading.dew_point, 1),
+                "temperature_error": correction.temperature_offset,
+                "dew_point_error": correction.dew_point_offset,
+                "accepted": correction.accepted,
+            }
+        )
+    return result
 
 
 async def async_get_config_entry_diagnostics(
@@ -34,6 +55,7 @@ async def async_get_config_entry_diagnostics(
             }
             for name, series in coordinator.series.items()
         },
+        "station": _station(coordinator),
         "catalog_objects": len(coordinator.shared.catalog),
         "comets": len(coordinator.shared.comets),
         "asteroids": len(coordinator.shared.asteroids),

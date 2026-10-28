@@ -109,6 +109,15 @@ déplacer ou renommer un site, **Configurer** (options) de changer les préfére
 mesure SQM, décrire votre horizon local (obstacles sous forme de couples `azimut:hauteur`, par
 ex. `0:15, 90:30, 180:10, 270:25`), choisir des objets favoris ou masquer le panneau latéral.
 
+**Station météo locale (facultatif).** Dans **Configurer**, choisissez les capteurs de
+température et d'humidité d'une station météo reliée à Home Assistant. Les conditions
+actuelles utilisent alors vos mesures, et la température et le point de rosée prévus pour
+les heures suivantes sont corrigés de l'écart constaté (correction qui s'estompe en 6 heures
+environ). Un jardin est souvent 1 à 3 °C plus frais et plus humide la nuit que la maille du
+modèle : le risque et l'heure de la rosée deviennent bien plus fiables. Utilisez un capteur
+à l'air libre et à l'ombre ; une station qui s'écarte de plus de 8 °C de la prévision
+(soleil, mur, intérieur) ou qui ne transmet plus depuis 90 minutes est ignorée.
+
 ## Tableau de bord
 
 Une entrée **AstroCast** apparaît dans la barre latérale (désactivable dans les options). La
